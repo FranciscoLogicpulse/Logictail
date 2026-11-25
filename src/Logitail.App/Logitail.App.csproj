@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -13,6 +13,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Logitail.Core\Logitail.Core.csproj" />
+    <ProjectReference Include="..\Logitail.Scanner\Logitail.Scanner.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- IEEE MAC vendor registry, shipped next to the exe -->
+    <None Include="..\..\data\oui.csv" Link="data\oui.csv" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

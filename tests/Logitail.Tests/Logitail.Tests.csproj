@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Logitail.Core\Logitail.Core.csproj" />
+    <ProjectReference Include="..\..\src\Logitail.Scanner\Logitail.Scanner.csproj" />
   </ItemGroup>
 
 </Project>

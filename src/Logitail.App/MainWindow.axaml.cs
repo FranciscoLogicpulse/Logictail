@@ -44,6 +44,13 @@ public partial class MainWindow : Window
             EncodingMenu.Items.Add(item);
         }
 
+        NetworkTab.Content = new Scanner.ScannerView();
+        Modes.SelectionChanged += (_, e) =>
+        {
+            if (e.Source != Modes) return; // ignore the inner file tabs' events bubbling up
+            LogStatusBar.IsVisible = Modes.SelectedItem != NetworkTab;
+        };
+
         Tabs.TemplateApplied += (_, e) =>
         {
             _tabStrip = e.NameScope.Find<ItemsPresenter>("PART_ItemsPresenter");

@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/Logitail.App/Logitail.App.csproj" />
     <Project Path="src/Logitail.Core/Logitail.Core.csproj" />
+    <Project Path="src/Logitail.Scanner/Logitail.Scanner.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Logitail.App.Tests/Logitail.App.Tests.csproj" />
