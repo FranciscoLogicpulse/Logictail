@@ -91,21 +91,38 @@
             CornerRadius="8" BoxShadow="0 1 4 0 #10000000" ClipToBounds="True">
       <Panel>
         <DockPanel x:Name="LogsPage">
-          <Border x:Name="LogStatusBar" DockPanel.Dock="Bottom" BorderThickness="0,1,0,0"
-                  BorderBrush="{StaticResource Rule}" Padding="14,5,8,5">
+          <!-- Log toolbar in BareTail's order (Open, Highlighting, Follow tail, encoding, file path), in Logictail's style.
+               Follow tail lives only here. -->
+          <Border DockPanel.Dock="Top" BorderThickness="0,0,0,1" BorderBrush="{StaticResource Rule}" Padding="10,8">
             <DockPanel>
-              <!-- Tail switch at the end of the status bar: always visible, never covers log text.
-                   The only follow-tail indicator: "Following" (click to pause) or teal "Follow tail" when paused. -->
-              <Button x:Name="TailButton" DockPanel.Dock="Right" Padding="12,4" Margin="12,0,0,0"
-                      Click="OnTailButton" IsVisible="False" ToolTip.Tip="Ctrl+T">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                  <PathIcon x:Name="TailIcon" Width="11" Height="11" Data="M11 4h2v12.2l4.6-4.6 1.4 1.4-7 7-7-7 1.4-1.4 4.6 4.6z" />
-                  <TextBlock x:Name="TailText" Text="Follow tail" FontSize="12" FontWeight="Bold" VerticalAlignment="Center" />
-                </StackPanel>
-              </Button>
-              <TextBlock x:Name="StatusText" FontSize="12" Foreground="{StaticResource Slate}" VerticalAlignment="Center"
-                         Text="Open a file to start: Ctrl+O, or drop it here." TextTrimming="CharacterEllipsis" />
+              <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Spacing="6" Margin="0,0,10,0">
+                <Button x:Name="ToolOpen" Classes="quiet" Click="OnOpen" Padding="8,5" ToolTip.Tip="Open a log file (Ctrl+O)">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <PathIcon Width="14" Height="14" Data="M3 6h6l2 2h10v11H3z" Foreground="{StaticResource Teal}" />
+                    <TextBlock Text="Open" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
+                <Button x:Name="ToolHighlighting" Classes="quiet" Click="OnHighlighting" Padding="8,5" ToolTip.Tip="Edit highlighting rules">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <PathIcon Width="14" Height="14" Data="M15 3l6 6-9 9H6v-6zM3 20h18v2H3z" Foreground="{StaticResource Teal}" />
+                    <TextBlock Text="Highlighting" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
+                <CheckBox x:Name="FollowCheck" Content="Follow tail" Margin="6,0,4,0" IsEnabled="False"
+                          Click="OnFollowCheck" ToolTip.Tip="Follow new lines as they arrive (Ctrl+T)" />
+                <ComboBox x:Name="EncodingCombo" Width="120" IsEnabled="False" ToolTip.Tip="Text encoding of this file" />
+              </StackPanel>
+              <!-- The current file's path, where BareTail shows its yellow file bar. -->
+              <Border Background="{StaticResource TealMist}" CornerRadius="4" Padding="10,0" MinHeight="32">
+                <SelectableTextBlock x:Name="PathText" VerticalAlignment="Center" TextTrimming="PrefixCharacterEllipsis"
+                                     Text="Open a file to view..." Foreground="{StaticResource Charcoal}" />
+              </Border>
             </DockPanel>
+          </Border>
+          <Border x:Name="LogStatusBar" DockPanel.Dock="Bottom" BorderThickness="0,1,0,0"
+                  BorderBrush="{StaticResource Rule}" Padding="14,6">
+            <TextBlock x:Name="StatusText" FontSize="12" Foreground="{StaticResource Slate}" VerticalAlignment="Center"
+                       Text="Open a file to start: Ctrl+O, or drop it here." TextTrimming="CharacterEllipsis" />
           </Border>
           <Panel>
             <TabControl x:Name="Tabs" Padding="0" />

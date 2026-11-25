@@ -78,19 +78,15 @@ public sealed class DesignShotsTests : IDisposable
         Assert.True(strip.IsVisible); // two files: small tabs on top
         var badges = window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToList();
         Assert.Contains("+12", badges);
-        // Tail button sits on the log: "Following" while following, teal "Follow tail" when paused.
-        var tail = window.FindControl<Button>("TailButton")!;
-        var tailText = window.FindControl<TextBlock>("TailText")!;
-        Assert.True(tail.IsVisible);
-        Assert.Equal("Following", tailText.Text);
-        tail.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        // BareTail-style toolbar: Follow tail checkbox, encoding and the file path.
+        var follow = window.FindControl<CheckBox>("FollowCheck")!;
+        Assert.True(follow.IsChecked);
+        Assert.EndsWith("orders-api.log", window.FindControl<SelectableTextBlock>("PathText")!.Text);
+        Assert.Equal("UTF-8", window.FindControl<ComboBox>("EncodingCombo")!.SelectedItem);
+        follow.IsChecked = false;
+        follow.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         Pump();
-        Assert.Equal("Follow tail", tailText.Text);
-        Assert.Contains("primary", tail.Classes);
         window.CaptureRenderedFrame()?.Save(Path.Combine(ShotDir, "design-logs.png"));
-        tail.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-        Pump();
-        Assert.Equal("Following", tailText.Text);
 
         // Collapse the sidebar to its rail.
         window.FindControl<Button>("SidebarToggle")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
