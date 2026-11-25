@@ -1,102 +1,147 @@
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Templates;
+using Avalonia.Input.Platform;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
+using Avalonia.Styling;
 using Avalonia.Threading;
 using Logitail.Scanner;
 
 namespace Logitail.App.Scanner;
 
-/// <summary>The Network tab: range input, scan controls, filters and the results table.</summary>
+/// <summary>The Network tab: range input, scan controls, filters, the results table and a details pane.</summary>
 public sealed class ScannerView : UserControl
 {
-    private enum SortColumn { Status, Name, Address, Manufacturer, Mac, Services }
+    private enum SortColumn { Favorite, Status, Name, Address, Manufacturer, Mac, Type, Services, Comment }
 
-    // Status, Name, IP, Manufacturer, MAC, Services
-    private static readonly string ColumnWidths = "90,220,120,230,150,*";
+    // ★, Status, Name, IP, Manufacturer, MAC, Type, Services, Comments
+    private const string ColumnWidths = "24,76,2*,104,2*,136,100,1.5*,1.5*"; // stars share the leftover width
     private static readonly IBrush AliveBrush = new SolidColorBrush(Color.FromRgb(0x2E, 0x7D, 0x32));
     private static readonly IBrush DeadBrush = new SolidColorBrush(Color.FromRgb(0x9E, 0x9E, 0x9E));
     private static readonly IBrush UnknownBrush = new SolidColorBrush(Color.FromRgb(0xEF, 0x6C, 0x00));
+    private static readonly IBrush StarBrush = new SolidColorBrush(Color.FromRgb(0xF9, 0xA8, 0x25));
 
     private readonly IProbes _probes;
+    private readonly HostStore _store;
     private readonly Task<OuiDatabase> _vendors;
-    private readonly TextBox _range = new() { PlaceholderText = "Example: 192.168.0.1-100, 192.168.0.200", MinWidth = 320 };
-    private readonly ComboBox _speed = new() { ItemsSource = new[] { "Fast", "Accurate (slower)" }, SelectedIndex = 0, Width = 160 };
-    private readonly Button _scanButton = new() { Content = "Scan", MinWidth = 90 }; // not IsDefault: Enter in the search box must not start a scan
-    private readonly Button _pauseButton = new() { Content = "Pause", MinWidth = 90, IsEnabled = false };
+    private readonly TextBox _range = new() { PlaceholderText = "Example: 192.168.0.1-100, 192.168.0.200", MinWidth = 300 };
+    private readonly ComboBox _speed = new() { ItemsSource = new[] { "Fast", "Accurate (slower)" }, SelectedIndex = 0, Width = 150 };
+    private readonly Button _scanButton = new() { Content = "Scan", MinWidth = 80 }; // not IsDefault: Enter in the search box must not start a scan
+    private readonly Button _pauseButton = new() { Content = "Pause", MinWidth = 80, IsEnabled = false };
     private readonly CheckBox _showAlive = new() { Content = "Show _alive", IsChecked = true };
     private readonly CheckBox _showDead = new() { Content = "Show _dead", IsChecked = false };
     private readonly CheckBox _showUnknown = new() { Content = "Show _unknown", IsChecked = true };
-    private readonly TextBox _search = new() { PlaceholderText = "Search results", Width = 240 };
-    private readonly ListBox _list = new();
-    private readonly ProgressBar _progress = new() { Minimum = 0, Maximum = 100, Width = 220, Height = 6 };
-    private readonly TextBlock _status = new() { VerticalAlignment = VerticalAlignment.Center };
+    private readonly CheckBox _favoritesOnly = new() { Content = "_Favorites only", IsChecked = false };
+    private readonly CheckBox _listShares = new() { Content = "List shared folders", IsChecked = false };
+    private readonly TextBox _search = new() { PlaceholderText = "Search results", Width = 220 };
+    private readonly ListBox _list = new() { SelectionMode = SelectionMode.Multiple };
+    private readonly StackPanel _details = new() { Spacing = 4, Margin = new Thickness(12) };
+    private readonly ProgressBar _progress = new() { Minimum = 0, Maximum = 100, Width = 200, Height = 6 };
+    private readonly TextBlock _status = new() { VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
     private readonly TextBlock _empty = new()
     {
-        Text = "No results yet. Enter a range and press Scan.", Foreground = Brushes.Gray,
-        HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, IsHitTestVisible = false,
+        Foreground = Brushes.Gray, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, IsHitTestVisible = false,
     };
 
     private readonly List<HostResult> _results = [];
+    private readonly Dictionary<System.Net.IPAddress, HostResult> _raw = []; // scan results before the user's notes
     private readonly ObservableCollection<HostResult> _visible = [];
     private readonly ConcurrentQueue<HostResult> _incoming = new();
     private readonly DispatcherTimer _flush = new() { Interval = TimeSpan.FromMilliseconds(200) };
+    private OuiDatabase _vendorDb = OuiDatabase.Empty;
     private ScanProgress? _lastProgress;
     private CancellationTokenSource? _cts;
     private PauseGate? _gate;
     private SortColumn _sort = SortColumn.Address;
     private bool _descending;
+    private string _idleState = "Ready"; // shown when not scanning: Ready, Finished or Stopped
 
-    public ScannerView() : this(new SystemProbes(), Path.Combine(AppContext.BaseDirectory, "data", "oui.csv")) { }
+    public ScannerView() : this(new SystemProbes(), Path.Combine(AppContext.BaseDirectory, "data", "oui.csv"), HostStore.Load(HostStore.DefaultPath)) { }
 
-    public ScannerView(IProbes probes, string vendorFile)
+    public ScannerView(IProbes probes, string vendorFile, HostStore store)
     {
         _probes = probes;
+        _store = store;
         _vendors = Task.Run(() => OuiDatabase.Load(vendorFile));
         _range.Text = LocalNetwork.Subnets().FirstOrDefault()?.ToRangeText() ?? "";
 
         var mySubnet = new Button { Content = "My subnet" };
         ToolTip.SetTip(mySubnet, "Fill in this PC's own subnet");
         mySubnet.Click += (_, _) => _range.Text = LocalNetwork.Subnets().FirstOrDefault()?.ToRangeText() ?? _range.Text;
+        var favorites = new Button { Content = "Favorites" };
+        ToolTip.SetTip(favorites, "Fill in the addresses of your favorite devices");
+        favorites.Click += (_, _) => FillFavorites();
         var fromFile = new Button { Content = "From file..." };
         ToolTip.SetTip(fromFile, "Load addresses from a text file: one IP, range or host name per line");
         fromFile.Click += async (_, _) => await LoadTargetsFileAsync();
         _scanButton.Click += async (_, _) => await ToggleScanAsync();
         _pauseButton.Click += (_, _) => TogglePause();
 
-        foreach (var box in new[] { _showAlive, _showDead, _showUnknown }) box.IsCheckedChanged += (_, _) => Rebuild();
+        var export = new Button { Content = "Export" };
+        export.Flyout = new MenuFlyout
+        {
+            Items =
+            {
+                MenuItem("CSV...", async () => await ExportAsync("csv", ',')),
+                MenuItem("CSV for Excel (semicolons)...", async () => await ExportAsync("csv", ';')),
+                MenuItem("HTML...", async () => await ExportAsync("html", ',')),
+                new Separator(),
+                MenuItem("Delete saved names, comments and favorites...", async () => await ForgetAllAsync()),
+            },
+        };
+
+        foreach (var box in new[] { _showAlive, _showDead, _showUnknown, _favoritesOnly }) box.IsCheckedChanged += (_, _) => Rebuild();
         _search.TextChanged += (_, _) => Rebuild();
         _flush.Tick += (_, _) => Flush();
 
         _list.ItemsSource = _visible;
+        // Rows stretch to the list width so star-sized columns line up with the header.
+        _list.Styles.Add(new Avalonia.Styling.Style(x => x.OfType<ListBoxItem>()) { Setters = { new Avalonia.Styling.Setter(ContentControl.HorizontalContentAlignmentProperty, HorizontalAlignment.Stretch) } });
         _list.ItemTemplate = new FuncDataTemplate<HostResult?>((host, _) => host is null ? new Control() : Row(host));
-        _list.SelectionMode = SelectionMode.Multiple;
-
-        var toolbar = new StackPanel
+        _list.SelectionChanged += (_, _) => ShowDetails();
+        _list.DoubleTapped += (_, _) => { if (Selected is { } h) _ = EditAsync(h); };
+        _list.ContextMenu = new ContextMenu();
+        _list.ContextMenu.Opening += (_, e) =>
         {
-            Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(8),
-            Children = { new TextBlock { Text = "Range:", VerticalAlignment = VerticalAlignment.Center }, _range, mySubnet, fromFile, _speed, _scanButton, _pauseButton },
+            if (Selected is { } h) FillContextMenu(_list.ContextMenu, h);
+            else e.Cancel = true;
         };
+
+        var toolbar = new WrapPanel { Margin = new Thickness(8, 8, 8, 0) };
+        foreach (var c in new Control[] { new TextBlock { Text = "Range:", VerticalAlignment = VerticalAlignment.Center }, _range, mySubnet, favorites, fromFile, _speed, _scanButton, _pauseButton, export })
+        {
+            c.Margin = new Thickness(0, 0, 8, 8);
+            toolbar.Children.Add(c);
+        }
         var filters = new StackPanel
         {
             Orientation = Orientation.Horizontal, Spacing = 16, Margin = new Thickness(8, 0, 8, 6),
-            Children = { _showAlive, _showDead, _showUnknown, _search },
+            Children = { _showAlive, _showDead, _showUnknown, _favoritesOnly, _search, _listShares },
         };
-        var statusBar = new StackPanel
-        {
-            Orientation = Orientation.Horizontal, Spacing = 12, Margin = new Thickness(8, 4),
-            Children = { _progress, _status },
-        };
+        var statusBar = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12, Margin = new Thickness(8, 4), Children = { _progress, _status } };
 
-        var table = new Grid { RowDefinitions = new RowDefinitions("Auto,*") };
+        var table = new Grid { RowDefinitions = new RowDefinitions("Auto,*"), ClipToBounds = true };
         table.Children.Add(Header());
         var body = new Panel { Children = { _list, _empty } };
         Grid.SetRow(body, 1);
         table.Children.Add(body);
+
+        var detailsPane = new Border
+        {
+            Width = 300,
+            BorderBrush = new SolidColorBrush(Color.FromRgb(0xDD, 0xDD, 0xDD)),
+            BorderThickness = new Thickness(1, 0, 0, 0),
+            Child = new ScrollViewer { Content = _details },
+        };
+        var main = new DockPanel();
+        DockPanel.SetDock(detailsPane, Dock.Right);
+        main.Children.Add(detailsPane);
+        main.Children.Add(table);
 
         var root = new DockPanel();
         DockPanel.SetDock(toolbar, Dock.Top);
@@ -106,9 +151,10 @@ public sealed class ScannerView : UserControl
         var statusBorder = new Border { BorderBrush = new SolidColorBrush(Color.FromRgb(0xDD, 0xDD, 0xDD)), BorderThickness = new Thickness(0, 1, 0, 0), Child = statusBar };
         DockPanel.SetDock(statusBorder, Dock.Bottom);
         root.Children.Add(statusBorder);
-        root.Children.Add(table);
+        root.Children.Add(main);
         Content = root;
         UpdateStatus();
+        ShowDetails();
     }
 
     /// <summary>All results of the current scan, unfiltered.</summary>
@@ -120,6 +166,19 @@ public sealed class ScannerView : UserControl
     public bool IsScanning => _cts is not null;
 
     public string RangeText { get => _range.Text ?? ""; set => _range.Text = value; }
+
+    public HostResult? Selected => _list.SelectedItem as HostResult;
+
+    /// <summary>Off by default: listing shares makes Windows sign in to each device as the current user.</summary>
+    public bool ListShares { get => _listShares.IsChecked == true; set => _listShares.IsChecked = value; }
+
+    /// <summary>The scan result before the user's notes were applied (what the notes store is keyed on).</summary>
+    private HostResult Raw(HostResult shown) => _raw.GetValueOrDefault(shown.Address, shown);
+
+    public void Select(HostResult host) => _list.SelectedItem = host;
+
+    /// <summary>Raised to launch a program; tests replace it so nothing really starts.</summary>
+    public Func<ProcessStartInfo, Task> Launch { get; set; } = psi => { Process.Start(psi)?.Dispose(); return Task.CompletedTask; };
 
     // --- scanning ---
 
@@ -135,6 +194,7 @@ public sealed class ScannerView : UserControl
         }
 
         _results.Clear();
+        _raw.Clear();
         _visible.Clear();
         while (_incoming.TryDequeue(out _)) { }
         _lastProgress = null;
@@ -145,13 +205,15 @@ public sealed class ScannerView : UserControl
         _pauseButton.Content = "Pause";
         _flush.Start();
         UpdateStatus();
+        ShowDetails();
 
-        var options = new ScanOptions { Speed = _speed.SelectedIndex == 1 ? ScanSpeed.Accurate : ScanSpeed.Fast };
+        var options = new ScanOptions { Speed = _speed.SelectedIndex == 1 ? ScanSpeed.Accurate : ScanSpeed.Fast, ListShares = ListShares };
         var stopped = false;
         string? failure = null;
         try
         {
-            var engine = new ScanEngine(_probes, await _vendors);
+            _vendorDb = await _vendors;
+            var engine = new ScanEngine(_probes, _vendorDb);
             await Task.Run(() => engine.ScanAsync(parsed.Targets, options, _incoming.Enqueue, p => _lastProgress = p, _gate, _cts.Token));
         }
         catch (OperationCanceledException)
@@ -173,7 +235,8 @@ public sealed class ScannerView : UserControl
             _scanButton.Content = "Scan";
             _pauseButton.IsEnabled = false;
             _pauseButton.Content = "Pause";
-            UpdateStatus(stopped ? "Stopped" : "Finished");
+            _idleState = stopped ? "Stopped" : "Finished";
+            UpdateStatus();
             if (failure is not null) ShowError("Scan failed: " + failure);
         }
     }
@@ -184,6 +247,13 @@ public sealed class ScannerView : UserControl
         if (_gate.IsPaused) { _gate.Resume(); _pauseButton.Content = "Pause"; }
         else { _gate.Pause(); _pauseButton.Content = "Resume"; }
         UpdateStatus();
+    }
+
+    private void FillFavorites()
+    {
+        var addresses = _store.FavoriteAddresses();
+        if (addresses.Count == 0) { ShowError("No favorites yet. Right-click a device and choose Add to favorites."); return; }
+        _range.Text = string.Join(", ", addresses);
     }
 
     private async Task LoadTargetsFileAsync()
@@ -216,6 +286,8 @@ public sealed class ScannerView : UserControl
         var added = false;
         while (_incoming.TryDequeue(out var host))
         {
+            _raw[host.Address] = host;
+            host = _store.Apply(host, _vendorDb);
             _results.Add(host);
             if (Matches(host)) { InsertSorted(host); added = true; }
         }
@@ -224,9 +296,21 @@ public sealed class ScannerView : UserControl
 
     private void Rebuild()
     {
+        var selected = Selected;
         _visible.Clear();
         foreach (var host in Sorted(_results.Where(Matches))) _visible.Add(host);
+        if (selected is not null) _list.SelectedItem = _visible.FirstOrDefault(h => h.Address.Equals(selected.Address));
         UpdateStatus();
+    }
+
+    /// <summary>Replaces a host after the user edited its notes.</summary>
+    private void Replace(HostResult old, HostResult updated)
+    {
+        var i = _results.IndexOf(old);
+        if (i >= 0) _results[i] = updated;
+        Rebuild();
+        _list.SelectedItem = _visible.FirstOrDefault(h => h.Address.Equals(updated.Address));
+        ShowDetails();
     }
 
     private bool Matches(HostResult h)
@@ -238,17 +322,17 @@ public sealed class ScannerView : UserControl
             _ => _showUnknown.IsChecked == true,
         };
         if (!statusOk) return false;
+        if (_favoritesOnly.IsChecked == true && !h.IsFavorite) return false;
         var q = _search.Text?.Trim();
         if (string.IsNullOrEmpty(q)) return true;
-        return new[] { h.Name, h.Address.ToString(), h.Manufacturer, h.Mac, h.Workgroup, ServicesText(h) }
+        return new[] { h.Name, h.Address.ToString(), h.Manufacturer, h.Mac, h.Workgroup, h.Comment, DeviceTypes.Label(h.DeviceType), ServicesText(h) }
             .Any(v => v?.Contains(q, StringComparison.OrdinalIgnoreCase) == true);
     }
 
     private void InsertSorted(HostResult host)
     {
-        var comparer = Comparer<HostResult>.Create(Compare);
         var i = 0;
-        while (i < _visible.Count && comparer.Compare(_visible[i], host) <= 0) i++;
+        while (i < _visible.Count && Compare(_visible[i], host) <= 0) i++;
         _visible.Insert(i, host);
     }
 
@@ -256,13 +340,17 @@ public sealed class ScannerView : UserControl
 
     private int Compare(HostResult a, HostResult b)
     {
+        static int Text(string? x, string? y) => string.Compare(x ?? "￿", y ?? "￿", StringComparison.OrdinalIgnoreCase);
         var c = _sort switch
         {
+            SortColumn.Favorite => b.IsFavorite.CompareTo(a.IsFavorite),
             SortColumn.Status => a.Status.CompareTo(b.Status),
-            SortColumn.Name => string.Compare(a.Name ?? "￿", b.Name ?? "￿", StringComparison.OrdinalIgnoreCase),
-            SortColumn.Manufacturer => string.Compare(a.Manufacturer ?? "￿", b.Manufacturer ?? "￿", StringComparison.OrdinalIgnoreCase),
-            SortColumn.Mac => string.Compare(a.Mac ?? "￿", b.Mac ?? "￿", StringComparison.OrdinalIgnoreCase),
+            SortColumn.Name => Text(a.Name, b.Name),
+            SortColumn.Manufacturer => Text(a.Manufacturer, b.Manufacturer),
+            SortColumn.Mac => Text(a.Mac, b.Mac),
+            SortColumn.Type => Text(DeviceTypes.Label(a.DeviceType).NullIfEmpty(), DeviceTypes.Label(b.DeviceType).NullIfEmpty()),
             SortColumn.Services => b.Services.Count.CompareTo(a.Services.Count),
+            SortColumn.Comment => Text(a.Comment, b.Comment),
             _ => 0,
         };
         if (c == 0) c = a.SortKey.CompareTo(b.SortKey); // IP order breaks ties
@@ -276,6 +364,172 @@ public sealed class ScannerView : UserControl
         Rebuild();
     }
 
+    // --- actions ---
+
+    public void FillContextMenu(ContextMenu menu, HostResult h)
+    {
+        menu.Items.Clear();
+        foreach (var action in Enum.GetValues<HostAction>().Where(a => HostActions.Applies(a, h)))
+            menu.Items.Add(MenuItem(HostActions.Label(action), () => RunAction(action, h)));
+        if (h.Shares.Count > 0)
+        {
+            var shares = new MenuItem { Header = "Open share" };
+            foreach (var share in h.Shares) shares.Items.Add(MenuItem($"{share.Name}{(share.Kind == ShareKind.Printer ? " (printer)" : "")}", () => RunAction(HostAction.Explore, h, share.Name)));
+            menu.Items.Add(shares);
+        }
+        else if (h.Services.Any(s => s.Kind == ServiceKind.Smb))
+        {
+            var list = MenuItem("List shared folders (signs in as you)", async () => await ListSharesAsync(h));
+            menu.Items.Add(list);
+        }
+        var more = new MenuItem { Header = "All tools" };
+        foreach (var action in Enum.GetValues<HostAction>()) more.Items.Add(MenuItem(HostActions.Label(action), () => RunAction(action, h)));
+        menu.Items.Add(more);
+        var wol = MenuItem("Wake-on-LAN", async () => await WakeAsync(h));
+        wol.IsEnabled = h.Mac is not null;
+        menu.Items.Add(wol);
+
+        menu.Items.Add(new Separator());
+        menu.Items.Add(MenuItem("Edit name and comment...", async () => await EditAsync(h)));
+        menu.Items.Add(MenuItem(h.IsFavorite ? "Remove from favorites" : "Add to favorites", () => ToggleFavorite(h)));
+        menu.Items.Add(new Separator());
+        var copy = new MenuItem { Header = "Copy" };
+        copy.Items.Add(MenuItem("IP address", async () => await CopyAsync(h.Address.ToString())));
+        if (h.Name is { } n) copy.Items.Add(MenuItem("Name", async () => await CopyAsync(n)));
+        if (h.Mac is { } m) copy.Items.Add(MenuItem("MAC address", async () => await CopyAsync(m)));
+        copy.Items.Add(MenuItem("Network path", async () => await CopyAsync(HostActions.UncPath(h.Address))));
+        copy.Items.Add(MenuItem("Row", async () => await CopyAsync(Export.ToCsv([h], '\t').Split(Environment.NewLine)[1])));
+        menu.Items.Add(copy);
+        menu.Items.Add(MenuItem("Export selected...", async () => await ExportAsync("csv", ',', selectedOnly: true)));
+    }
+
+    public async void RunAction(HostAction action, HostResult host, string? share = null)
+    {
+        try
+        {
+            await Launch(HostActions.Command(action, host.Address, share));
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException or ArgumentException)
+        {
+            ShowError($"{HostActions.Label(action)} failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>Lists one device's shares on request (signs in to it as the current Windows user).</summary>
+    private async Task ListSharesAsync(HostResult h)
+    {
+        ShowInfo($"Listing shared folders on {h.Address}...");
+        var shares = await _probes.SharesAsync(h.Address, TimeSpan.FromSeconds(10), CancellationToken.None);
+        var raw = Raw(h) with { Shares = shares };
+        raw = raw with { DeviceType = DeviceTypes.Guess(raw) };
+        _raw[h.Address] = raw;
+        Replace(h, _store.Apply(raw, _vendorDb));
+        ShowInfo(shares.Count == 0 ? $"{h.Address} shares nothing you can see (or refused)." : $"{h.Address} shares {shares.Count} item(s).");
+    }
+
+    private async Task WakeAsync(HostResult h)
+    {
+        if (h.Mac is null) return;
+        try
+        {
+            var adapters = await WakeOnLan.SendAsync(h.Mac);
+            if (adapters == 0) ShowError("Wake-on-LAN: no network adapter could send the packet.");
+            else ShowInfo($"Wake-on-LAN packet for {h.Mac} sent from {adapters} network adapter(s).");
+        }
+        catch (Exception ex) when (ex is System.Net.Sockets.SocketException or ArgumentException)
+        {
+            ShowError("Wake-on-LAN failed: " + ex.Message);
+        }
+    }
+
+    public async Task EditAsync(HostResult h)
+    {
+        if (TopLevel.GetTopLevel(this) is not Window owner) return;
+        var note = await new EditHostDialog(Raw(h), _store.Get(Raw(h))).ShowDialog<HostNote?>(owner);
+        if (note is null) return;
+        SaveNote(h, note);
+    }
+
+    public void ToggleFavorite(HostResult h)
+    {
+        var note = _store.Get(Raw(h)) ?? new HostNote();
+        SaveNote(h, note with { Favorite = !note.Favorite });
+    }
+
+    private void SaveNote(HostResult h, HostNote note)
+    {
+        try
+        {
+            _store.Set(Raw(h), note);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            ShowError("Could not save: " + ex.Message);
+            return;
+        }
+        // Re-apply notes to the raw scan result so a cleared name falls back to the scanned one.
+        Replace(h, _store.Apply(_raw.GetValueOrDefault(h.Address, h), _vendorDb));
+    }
+
+    private async Task ForgetAllAsync()
+    {
+        if (TopLevel.GetTopLevel(this) is not Window owner) return;
+        var confirm = new Window
+        {
+            Title = "Delete saved data", SizeToContent = SizeToContent.WidthAndHeight, CanResize = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var yes = new Button { Content = "Delete" };
+        var no = new Button { Content = "Cancel", IsCancel = true, IsDefault = true };
+        yes.Click += (_, _) => confirm.Close(true);
+        no.Click += (_, _) => confirm.Close(false);
+        confirm.Content = new StackPanel
+        {
+            Margin = new Thickness(18), Spacing = 14,
+            Children =
+            {
+                new TextBlock { Text = $"Delete the names, comments, MAC addresses and favorites you saved for {_store.All.Count} device(s)?\nThis can't be undone.", TextWrapping = TextWrapping.Wrap, MaxWidth = 420 },
+                new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right, Children = { yes, no } },
+            },
+        };
+        if (!await confirm.ShowDialog<bool>(owner)) return;
+        _store.Clear();
+        for (var i = 0; i < _results.Count; i++) _results[i] = _raw.GetValueOrDefault(_results[i].Address, _results[i]);
+        Rebuild();
+        ShowInfo("Saved device data deleted.");
+    }
+
+    private async Task ExportAsync(string format, char delimiter, bool selectedOnly = false)
+    {
+        var hosts = selectedOnly ? _list.SelectedItems?.OfType<HostResult>().ToList() ?? [] : _visible.ToList();
+        if (hosts.Count == 0) { ShowError("Nothing to export."); return; }
+        if (TopLevel.GetTopLevel(this)?.StorageProvider is not { } storage) return;
+        var file = await storage.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Export scan results",
+            SuggestedFileName = $"Scan_results_{DateTime.Now:yyyy-MM-dd_HHmm}.{format}",
+            DefaultExtension = format,
+            FileTypeChoices = [new FilePickerFileType(format.ToUpperInvariant()) { Patterns = [$"*.{format}"] }],
+        });
+        if (file?.TryGetLocalPath() is not { } path) return;
+        try
+        {
+            var text = format == "html" ? Export.ToHtml(hosts, $"Logitail scan {DateTime.Now:yyyy-MM-dd HH:mm}") : Export.ToCsv(hosts, delimiter);
+            // UTF-8 with BOM so Excel shows accented names correctly.
+            await File.WriteAllTextAsync(path, text, new System.Text.UTF8Encoding(format == "csv"));
+            ShowInfo($"Exported {hosts.Count} device(s) to {path}");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            ShowError($"Could not write {path}: {ex.Message}");
+        }
+    }
+
+    private async Task CopyAsync(string text)
+    {
+        if (TopLevel.GetTopLevel(this)?.Clipboard is { } clipboard) await clipboard.SetTextAsync(text);
+    }
+
     // --- layout ---
 
     private Grid Header()
@@ -283,8 +537,9 @@ public sealed class ScannerView : UserControl
         var grid = new Grid { ColumnDefinitions = new ColumnDefinitions(ColumnWidths), Margin = new Thickness(12, 0, 8, 0) };
         (string Text, SortColumn Column)[] columns =
         [
-            ("Status", SortColumn.Status), ("Name", SortColumn.Name), ("IP", SortColumn.Address),
-            ("Manufacturer", SortColumn.Manufacturer), ("MAC address", SortColumn.Mac), ("Services", SortColumn.Services),
+            ("★", SortColumn.Favorite), ("Status", SortColumn.Status), ("Name", SortColumn.Name), ("IP", SortColumn.Address),
+            ("Manufacturer", SortColumn.Manufacturer), ("MAC address", SortColumn.Mac), ("Type", SortColumn.Type),
+            ("Services", SortColumn.Services), ("Comments", SortColumn.Comment),
         ];
         for (var i = 0; i < columns.Length; i++)
         {
@@ -310,24 +565,72 @@ public sealed class ScannerView : UserControl
             HostStatus.Dead => ("○ Dead", DeadBrush),
             _ => ("? Unknown", UnknownBrush),
         };
-        string?[] cells = [label, h.Name ?? h.NetBiosName, h.Address.ToString(), h.Manufacturer, h.Mac, ServicesText(h)];
+        string?[] cells =
+        [
+            h.IsFavorite ? "★" : "", label, h.Name ?? h.NetBiosName, h.Address.ToString(), h.Manufacturer, h.Mac,
+            DeviceTypes.Label(h.DeviceType), ServicesText(h), h.Comment,
+        ];
         for (var i = 0; i < cells.Length; i++)
         {
             var block = new TextBlock { Text = cells[i] ?? "", TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 0, 8, 0) };
-            if (i == 0) block.Foreground = brush;
-            if (h.Status == HostStatus.Dead && i > 0) block.Foreground = DeadBrush;
+            if (i == 0) block.Foreground = StarBrush;
+            else if (i == 1) block.Foreground = brush;
+            else if (h.Status == HostStatus.Dead) block.Foreground = DeadBrush;
             Grid.SetColumn(block, i);
             grid.Children.Add(block);
         }
-        var tip = string.Join("\n", new[]
-        {
-            h.Name, h.NetBiosName is { } nb && nb != h.Name ? $"NetBIOS: {nb}" : null,
-            h.Workgroup is { } wg ? $"Workgroup: {wg}" : null,
-            h.User is { } u ? $"User: {u}" : null,
-            h.Error is { } err ? $"Probe failed: {err}" : null,
-        }.Concat(h.Services.Select(s => $"{Services.Label(s.Kind)}: {s.Detail ?? "open"}")).Where(s => !string.IsNullOrEmpty(s)));
-        if (tip.Length > 0) ToolTip.SetTip(grid, tip);
         return grid;
+    }
+
+    private void ShowDetails()
+    {
+        _details.Children.Clear();
+        if (Selected is not { } h)
+        {
+            _details.Children.Add(new TextBlock { Text = "Select a device to see its details.\nRight-click for tools; double-click to add a name or comment.", Foreground = Brushes.Gray, TextWrapping = TextWrapping.Wrap });
+            return;
+        }
+
+        _details.Children.Add(new SelectableTextBlock { Text = h.Name ?? h.Address.ToString(), FontSize = 16, FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap });
+        void Field(string label, string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return;
+            _details.Children.Add(new TextBlock { Text = label, Foreground = Brushes.Gray, FontSize = 11, Margin = new Thickness(0, 6, 0, 0) });
+            _details.Children.Add(new SelectableTextBlock { Text = value, TextWrapping = TextWrapping.Wrap });
+        }
+        Field("Status", h.Status + (h.Error is { } err ? $" ({err})" : ""));
+        Field("IP address", h.Address.ToString());
+        Field("MAC address", h.Mac);
+        Field("Manufacturer", h.Manufacturer);
+        Field("Type (guess)", DeviceTypes.Label(h.DeviceType));
+        Field("NetBIOS name", h.NetBiosName);
+        Field("Workgroup", h.Workgroup);
+        Field("User", h.User);
+        Field("Services", string.Join("\n", h.Services.Select(s => $"{Services.Label(s.Kind)} (port {Services.Port(s.Kind)}){(s.Detail is null ? "" : ": " + s.Detail)}")));
+        Field("Shared", string.Join("\n", h.Shares.Select(s => $"{s.Name}{(s.Kind == ShareKind.Printer ? " (printer)" : "")}{(s.Remark is null ? "" : " - " + s.Remark)}")));
+        Field("Comments", h.Comment);
+        Field("Scanned", h.ScannedAt.ToLocalTime().ToString("g"));
+
+        var buttons = new WrapPanel { Margin = new Thickness(0, 10, 0, 0) };
+        foreach (var action in Enum.GetValues<HostAction>().Where(a => HostActions.Applies(a, h) && a is not (HostAction.Ping or HostAction.Tracert)))
+            buttons.Children.Add(SmallButton(HostActions.Label(action), () => RunAction(action, h)));
+        buttons.Children.Add(SmallButton("Edit...", () => _ = EditAsync(h)));
+        buttons.Children.Add(SmallButton(h.IsFavorite ? "★ Favorite" : "☆ Add to favorites", () => ToggleFavorite(h)));
+        _details.Children.Add(buttons);
+    }
+
+    private static Button SmallButton(string text, Action click)
+    {
+        var b = new Button { Content = text, Margin = new Thickness(0, 0, 6, 6), Padding = new Thickness(8, 3), FontSize = 12 };
+        b.Click += (_, _) => click();
+        return b;
+    }
+
+    private static MenuItem MenuItem(string header, Action click)
+    {
+        var item = new MenuItem { Header = header };
+        item.Click += (_, _) => click();
+        return item;
     }
 
     private static string ServicesText(HostResult h) => string.Join(", ", h.Services.Select(s => Services.Label(s.Kind)));
@@ -335,16 +638,21 @@ public sealed class ScannerView : UserControl
     private void UpdateStatus(string? state = null)
     {
         _empty.IsVisible = _visible.Count == 0;
-        if (_results.Count > 0 && _visible.Count == 0) _empty.Text = "No items match your filters.";
-        else _empty.Text = "No results yet. Enter a range and press Scan.";
+        _empty.Text = _results.Count > 0 ? "No items match your filters." : "No results yet. Enter a range and press Scan.";
 
         var p = _lastProgress;
         _progress.Value = p?.Percent ?? 0;
         _status.Foreground = Brushes.Black;
-        state ??= _cts is null ? "Ready" : _gate?.IsPaused == true ? "Paused" : "Scanning...";
+        state ??= _cts is null ? _idleState : _gate?.IsPaused == true ? "Paused" : "Scanning...";
         _status.Text = p is null
             ? state
             : $"{state}  {p.Percent:0}%  |  {p.Alive} alive, {p.Dead} dead, {p.Unknown} unknown  |  {p.Done:N0} of {p.Total:N0} addresses  |  showing {_visible.Count:N0}";
+    }
+
+    private void ShowInfo(string message)
+    {
+        _status.Text = message;
+        _status.Foreground = Brushes.Black;
     }
 
     private void ShowError(string message)
@@ -352,4 +660,9 @@ public sealed class ScannerView : UserControl
         _status.Text = message;
         _status.Foreground = Brushes.Firebrick;
     }
+}
+
+internal static class StringExtensions
+{
+    public static string? NullIfEmpty(this string s) => s.Length == 0 ? null : s;
 }

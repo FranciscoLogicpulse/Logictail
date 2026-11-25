@@ -52,6 +52,13 @@ public sealed record HostResult
     public DateTimeOffset ScannedAt { get; init; } = DateTimeOffset.Now;
     /// <summary>Why the status is Unknown, when a probe failed.</summary>
     public string? Error { get; init; }
+    /// <summary>Shared folders and printers (SMB), without hidden admin shares.</summary>
+    public IReadOnlyList<SharedResource> Shares { get; init; } = [];
+    public DeviceType DeviceType { get; init; }
+
+    // From the user's notes (HostStore), not the network.
+    public string? Comment { get; init; }
+    public bool IsFavorite { get; init; }
 
     public uint SortKey => IpRangeParser.ToUInt(Address);
 }

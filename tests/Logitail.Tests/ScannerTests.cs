@@ -195,6 +195,8 @@ public sealed class ScanEngineTests
         public Task<string?> ServiceDetailAsync(IPAddress ip, ServiceKind s, TimeSpan t, CancellationToken ct) =>
             Task.FromResult(s == ServiceKind.Http ? "Router login" : null);
 
+        public Task<IReadOnlyList<SharedResource>> SharesAsync(IPAddress ip, TimeSpan t, CancellationToken ct) => Task.FromResult<IReadOnlyList<SharedResource>>([]);
+
         private static void InterlockedMax(ref int target, int value)
         {
             int current;

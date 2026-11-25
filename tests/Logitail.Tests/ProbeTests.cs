@@ -106,6 +106,7 @@ public sealed class ScanEngineFailureTests
         public Task<NetBiosInfo?> NetBiosAsync(IPAddress ip, TimeSpan t, CancellationToken ct) => Task.FromResult<NetBiosInfo?>(null);
         public Task<bool> TcpOpenAsync(IPAddress ip, int port, TimeSpan t, CancellationToken ct) { Maybe(ip, "tcp", ct); return Task.FromResult(port == 80); }
         public Task<string?> ServiceDetailAsync(IPAddress ip, ServiceKind s, TimeSpan t, CancellationToken ct) { Maybe(ip, "detail", ct); return Task.FromResult<string?>("ok"); }
+        public Task<IReadOnlyList<SharedResource>> SharesAsync(IPAddress ip, TimeSpan t, CancellationToken ct) => Task.FromResult<IReadOnlyList<SharedResource>>([]);
     }
 
     private static int Last(IPAddress ip) => ip.GetAddressBytes()[3];

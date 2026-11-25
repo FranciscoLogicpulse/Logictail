@@ -18,6 +18,8 @@ public interface IProbes
     Task<bool> TcpOpenAsync(IPAddress ip, int port, TimeSpan timeout, CancellationToken ct);
     /// <summary>Page title or first banner line for an open service, or null.</summary>
     Task<string?> ServiceDetailAsync(IPAddress ip, ServiceKind service, TimeSpan timeout, CancellationToken ct);
+    /// <summary>Shared folders and printers on a host with SMB open.</summary>
+    Task<IReadOnlyList<SharedResource>> SharesAsync(IPAddress ip, TimeSpan timeout, CancellationToken ct);
 }
 
 /// <summary>Real probes using the OS network stack.</summary>
@@ -133,6 +135,14 @@ public sealed partial class SystemProbes : IProbes
             // Any failure (timeout, refused, TLS, garbage reply) just means "no detail"; only the user's Stop propagates.
             return null;
         }
+    }
+
+    public async Task<IReadOnlyList<SharedResource>> SharesAsync(IPAddress ip, TimeSpan timeout, CancellationToken ct)
+    {
+        // NetShareEnum blocks and can take many seconds on a slow host: run it on its own thread and stop waiting at the timeout.
+        var list = Task.Factory.StartNew(() => SmbShares.List(ip), CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+        try { return await list.WaitAsync(timeout, ct); }
+        catch (TimeoutException) { return []; }
     }
 
     /// <summary>

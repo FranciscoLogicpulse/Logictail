@@ -16,6 +16,11 @@ public sealed record ScanOptions
     public ScanSpeed Speed { get; init; } = ScanSpeed.Fast;
     public int Threads { get; init; } = 64;
     public bool CheckServices { get; init; } = true;
+    /// <summary>
+    /// List shared folders on hosts with SMB open. Off by default: Windows signs in to each such device
+    /// with the current user's credentials to list them.
+    /// </summary>
+    public bool ListShares { get; init; }
 
     public TimeSpan PingTimeout => Speed == ScanSpeed.Fast ? TimeSpan.FromMilliseconds(600) : TimeSpan.FromMilliseconds(1500);
     public TimeSpan PortTimeout => Speed == ScanSpeed.Fast ? TimeSpan.FromMilliseconds(500) : TimeSpan.FromMilliseconds(1500);
@@ -143,11 +148,14 @@ public sealed class ScanEngine(IProbes probes, OuiDatabase vendors)
 
         var dns = probes.ReverseDnsAsync(ip, options.LookupTimeout, ct);
         var netbios = probes.NetBiosAsync(ip, options.LookupTimeout, ct);
-        await Task.WhenAll(dns, netbios);
+        var shares = options.ListShares && services.Any(s => s.Kind == ServiceKind.Smb)
+            ? probes.SharesAsync(ip, options.LookupTimeout * 2, ct)
+            : Task.FromResult<IReadOnlyList<SharedResource>>([]);
+        await Task.WhenAll(dns, netbios, shares);
         var nb = netbios.Result;
         var mac = arpMac ?? nb?.Mac;
 
-        return new HostResult
+        var host = new HostResult
         {
             Address = ip,
             Status = HostStatus.Alive,
@@ -158,7 +166,9 @@ public sealed class ScanEngine(IProbes probes, OuiDatabase vendors)
             Mac = mac,
             Manufacturer = vendors.Lookup(mac),
             Services = services,
+            Shares = shares.Result,
         };
+        return host with { DeviceType = DeviceTypes.Guess(host) };
     }
 
     private async Task<List<FoundService>> ServicesAsync(IPAddress ip, ScanOptions options, CancellationToken ct)
