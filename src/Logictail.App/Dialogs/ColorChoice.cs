@@ -16,6 +16,8 @@ public sealed class ColorChoice : StackPanel
         ("Dark Cyan", 0xFF00838F), ("Dark Magenta", 0xFF8E24AA),
         ("Gray 1", 0xFF212121), ("Gray 2", 0xFF424242), ("Gray 3", 0xFF616161), ("Gray 4", 0xFF9E9E9E),
         ("Gray 5", 0xFFBDBDBD), ("Gray 6", 0xFFE0E0E0), ("Gray 7", 0xFFF5F5F5),
+        // Soft tints used by the default rules: readable backgrounds with matching dark text.
+        ("Soft red", 0xFFFBE1DC), ("Soft orange", 0xFFFDEBDD), ("Brick", 0xFF8A2A1B), ("Brown", 0xFF7A4A12),
     ];
 
     private readonly ComboBox _combo = new() { Width = 150 };

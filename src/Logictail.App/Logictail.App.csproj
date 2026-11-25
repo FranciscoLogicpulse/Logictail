@@ -7,6 +7,8 @@
     <Nullable>enable</Nullable>
     <AssemblyName>Logictail</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Exe icon in Explorer and the taskbar; regenerate with tools\make-icon.ps1 -->
+    <ApplicationIcon>Assets\logictail.ico</ApplicationIcon>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
   </PropertyGroup>

@@ -78,7 +78,19 @@ public sealed class DesignShotsTests : IDisposable
         Assert.True(strip.IsVisible); // two files: small tabs on top
         var badges = window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToList();
         Assert.Contains("+12", badges);
+        // Tail button sits on the log: "Pause" while following, teal "Follow tail" when paused.
+        var tail = window.FindControl<Button>("TailButton")!;
+        var tailText = window.FindControl<TextBlock>("TailText")!;
+        Assert.True(tail.IsVisible);
+        Assert.Equal("Pause", tailText.Text);
+        tail.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Pump();
+        Assert.Equal("Follow tail", tailText.Text);
+        Assert.Contains("primary", tail.Classes);
         window.CaptureRenderedFrame()?.Save(Path.Combine(ShotDir, "design-logs.png"));
+        tail.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Pump();
+        Assert.Equal("Pause", tailText.Text);
 
         // Collapse the sidebar to its rail.
         window.FindControl<Button>("SidebarToggle")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
@@ -103,7 +115,7 @@ public sealed class DesignShotsTests : IDisposable
         var view = new ScannerView(new DemoNetwork(), Path.Combine(AppContext.BaseDirectory, "data", "oui.csv"), HostStore.InMemory())
         {
             RangeText = "192.168.1.1-40",
-            PortsText = "22, 80, 443, 445, 3389, 8080",
+            PortsText = "22, 3389",
         };
         window.FindControl<ContentControl>("NetworkPage")!.Content = view;
         window.FindControl<Button>("NavNetwork")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
@@ -117,6 +129,10 @@ public sealed class DesignShotsTests : IDisposable
         Pump();
         view.Select(view.VisibleResults.Single(h => h.Name == "nas.home"));
         Pump();
+        // Devices with a scanned-for port come first.
+        var withPorts = view.VisibleResults.TakeWhile(h => h.OpenPorts.Any(p => p.Confirmed)).Count();
+        Assert.True(withPorts > 0);
+        Assert.All(view.VisibleResults.Skip(withPorts), h => Assert.DoesNotContain(h.OpenPorts, p => p.Confirmed));
         window.CaptureRenderedFrame()?.Save(Path.Combine(ShotDir, "design-network.png"));
         window.Close();
     }

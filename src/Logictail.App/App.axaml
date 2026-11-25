@@ -51,11 +51,15 @@
       <Setter Property="BorderBrush" Value="{StaticResource TealLight}" />
     </Style>
 
-    <!-- The selected file in the sidebar: teal name. -->
-    <Style Selector="ListBox.files ListBoxItem:selected TextBlock">
-      <Setter Property="Foreground" Value="{StaticResource Teal}" />
-      <Setter Property="FontWeight" Value="Bold" />
+    <!-- Disabled buttons stay outlined and fade, instead of turning into grey blocks. -->
+    <Style Selector="Button:disabled /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource Paper}" />
+      <Setter Property="BorderBrush" Value="{StaticResource Rule}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="#A7B1B5" />
     </Style>
+
+
 
     <!-- File tabs above the log: small, quiet, teal underline on the open one. -->
     <Style Selector="TabControl#Tabs TabItem">
@@ -77,6 +81,7 @@
       <Setter Property="Background" Value="{StaticResource Teal}" />
       <Setter Property="Foreground" Value="White" />
       <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
     </Style>
     <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="{StaticResource TealDark}" />

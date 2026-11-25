@@ -21,7 +21,7 @@ public sealed class HighlightingDialog : Window
     private readonly CheckBox _italic = new() { Content = "I_talic" };
     private readonly ColorChoice _fg = new();
     private readonly ColorChoice _bg = new();
-    private readonly TextBlock _regexError = new() { Foreground = Brushes.Firebrick, TextWrapping = TextWrapping.Wrap };
+    private readonly TextBlock _regexError = new() { Foreground = Brushes.Firebrick, TextWrapping = TextWrapping.Wrap, IsVisible = false };
     private readonly Button _delete = new() { Content = "D_elete" };
     private readonly Button _up = new() { Content = "Move _Up" };
     private readonly Button _down = new() { Content = "Move _Down" };
@@ -179,9 +179,10 @@ public sealed class HighlightingDialog : Window
     private void ShowRegexError(HighlightRule rule)
     {
         _regexError.Text = "";
+        _regexError.IsVisible = false;
         if (!rule.IsRegex) return;
         try { _ = new System.Text.RegularExpressions.Regex(rule.Pattern); }
-        catch (ArgumentException ex) { _regexError.Text = "Invalid regular expression: " + ex.Message; }
+        catch (ArgumentException ex) { _regexError.Text = "Invalid regular expression: " + ex.Message; _regexError.IsVisible = true; }
     }
 
     private void Move(int delta)

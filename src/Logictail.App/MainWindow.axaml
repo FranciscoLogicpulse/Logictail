@@ -2,7 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:app="clr-namespace:Logictail.App"
         x:Class="Logictail.App.MainWindow"
-        Title="Logictail" Width="1180" Height="720" MinWidth="640" MinHeight="400"
+        Title="Logictail" Icon="/Assets/logictail.ico" Width="1180" Height="720" MinWidth="640" MinHeight="400"
         Background="{StaticResource Canvas}"
         DragDrop.AllowDrop="True">
   <DockPanel>
@@ -94,12 +94,24 @@
       <Panel>
         <DockPanel x:Name="LogsPage">
           <Border x:Name="LogStatusBar" DockPanel.Dock="Bottom" BorderThickness="0,1,0,0"
-                  BorderBrush="{StaticResource Rule}" Padding="14,6">
-            <TextBlock x:Name="StatusText" FontSize="12" Foreground="{StaticResource Slate}"
-                       Text="Open a file to start: Ctrl+O, or drop it here." TextTrimming="CharacterEllipsis" />
+                  BorderBrush="{StaticResource Rule}" Padding="14,5,8,5">
+            <DockPanel>
+              <!-- Tail switch at the end of the status bar: always visible, never covers log text.
+                   Teal "Follow tail" when paused, quiet "Pause" when following. -->
+              <Button x:Name="TailButton" DockPanel.Dock="Right" Padding="12,4" Margin="12,0,0,0"
+                      Click="OnTailButton" IsVisible="False" ToolTip.Tip="Ctrl+T">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <PathIcon x:Name="TailIcon" Width="11" Height="11" Data="M11 4h2v12.2l4.6-4.6 1.4 1.4-7 7-7-7 1.4-1.4 4.6 4.6z" />
+                  <TextBlock x:Name="TailText" Text="Follow tail" FontSize="12" FontWeight="Bold" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
+              <TextBlock x:Name="StatusText" FontSize="12" Foreground="{StaticResource Slate}" VerticalAlignment="Center"
+                         Text="Open a file to start: Ctrl+O, or drop it here." TextTrimming="CharacterEllipsis" />
+            </DockPanel>
           </Border>
           <Panel>
             <TabControl x:Name="Tabs" Padding="0" />
+
             <StackPanel x:Name="EmptyLogs" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="12">
               <TextBlock Text="No log open" FontSize="15" FontWeight="Bold" HorizontalAlignment="Center" />
               <TextBlock Text="Drop a file here, or open one to follow it as it grows." Foreground="{StaticResource Slate}" HorizontalAlignment="Center" />

@@ -23,10 +23,14 @@ public sealed class ScannerView : UserControl
     // ★, Status, Name, IP, Manufacturer, MAC, Type, Services, Comments. Stars share the leftover width.
     private const string WideColumns = "24,28,2*,104,2*,136,100,1.5*,1.5*";
     private const string CompactColumns = "24,28,2*,104,2*,0,100,1.5*,0";
+    private const string NarrowColumns = "24,28,2*,104,0,0,90,1.5*,0";
     private static readonly int[] WideOnly = [5, 8];
+    private static readonly int[] NotNarrow = [4, 5, 8];
+    private bool _narrow;
     private bool _compact;
     private Grid _header = null!;
-    private string ColumnWidths => _compact ? CompactColumns : WideColumns;
+    private string ColumnWidths => _narrow ? NarrowColumns : _compact ? CompactColumns : WideColumns;
+    private bool Hidden(int column) => _narrow ? NotNarrow.Contains(column) : _compact && WideOnly.Contains(column);
     private static readonly IBrush AliveBrush = Palette.Green;
     private static readonly IBrush DeadBrush = Palette.Muted;
     private static readonly IBrush UnknownBrush = Palette.Orange;
@@ -46,7 +50,7 @@ public sealed class ScannerView : UserControl
     private readonly CheckBox _showUnknown = new() { Content = "Show _unknown", IsChecked = true };
     private readonly CheckBox _favoritesOnly = new() { Content = "_Favorites only", IsChecked = false };
     private readonly CheckBox _listShares = new() { Content = "Shares", IsChecked = false };
-    private readonly TextBox _search = new() { PlaceholderText = "Search results", Width = 220 };
+    private readonly TextBox _search = new() { PlaceholderText = "Search results", Width = 200 };
     private readonly TextBox _ports = new() { PlaceholderText = "No port scan (e.g. 22, 80, 443, UDP: 53)", Width = 280 };
     private readonly ListBox _list = new() { SelectionMode = SelectionMode.Multiple };
     private readonly StackPanel _details = new() { Spacing = 4, Margin = new Thickness(12) };
@@ -137,19 +141,18 @@ public sealed class ScannerView : UserControl
             else e.Cancel = true;
         };
 
-        var toolbar = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto,*,Auto,Auto,Auto,Auto,Auto,Auto"), Margin = new Thickness(14, 12, 14, 8) };
-        Control[] tools = [new TextBlock { Text = "From", VerticalAlignment = VerticalAlignment.Center, FontWeight = FontWeight.Bold }, _from,
-            new TextBlock { Text = "To", VerticalAlignment = VerticalAlignment.Center, FontWeight = FontWeight.Bold }, _to, fill, _speed, _listShares, _scanButton, _pauseButton, export];
-        for (var i = 0; i < tools.Length; i++)
-        {
-            tools[i].Margin = new Thickness(i == 0 ? 0 : 8, 0, 0, 0);
-            Grid.SetColumn(tools[i], i);
-            toolbar.Children.Add(tools[i]);
-        }
-        // Labels sit close to their own box and apart from the previous one.
-        tools[0].Margin = new Thickness(0, 0, 10, 0);
-        tools[2].Margin = new Thickness(14, 0, 10, 0);
-        tools[1].Margin = tools[3].Margin = new Thickness(0);
+        // Toolbar = two groups that wrap as a whole when the window is narrow, so nothing squeezes or overlaps.
+        // Row labels share one width so the From and Ports boxes line up.
+        TextBlock Label(string text, double width = 44) => new() { Text = text, Width = width, FontWeight = FontWeight.Bold, VerticalAlignment = VerticalAlignment.Center };
+        _from.Width = _to.Width = 140;
+        _from.MinWidth = _to.MinWidth = 0;
+        var rangeGroup = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(0, 0, 20, 8),
+            Children = { Label("From"), _from, Label("To", 20), _to, fill } };
+        var actionGroup = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(0, 0, 0, 8),
+            Children = { _speed, _scanButton, _pauseButton } };
+        _speed.Width = 130;
+        _listShares.VerticalAlignment = VerticalAlignment.Center;
+        var toolbar = new WrapPanel { Margin = new Thickness(14, 12, 14, 0), Children = { rangeGroup, actionGroup } };
         var filters = new WrapPanel { Margin = new Thickness(14, 0, 14, 8) };
         var presets = new Button { Content = "Presets" };
         presets.Flyout = new MenuFlyout
@@ -164,16 +167,21 @@ public sealed class ScannerView : UserControl
             },
         };
         ToolTip.SetTip(_ports, "Ports to check on every live device. Ranges and UDP allowed: 22, 80, 8000-8100, UDP: 53, 161");
-        var portsRow = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,Auto,Auto,*,Auto"), Margin = new Thickness(14, 0, 14, 8) };
-        Control[] portControls = [new TextBlock { Text = "Ports", FontWeight = FontWeight.Bold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) }, _ports, presets, new Control(), _search];
-        presets.Margin = new Thickness(8, 0, 0, 0);
-        for (var i = 0; i < portControls.Length; i++) { Grid.SetColumn(portControls[i], i); portsRow.Children.Add(portControls[i]); }
+        _ports.Width = 140 + 8 + 20 + 8 + 140; // same span as From box + "To" + To box, so Presets sits under Fill range
+        var portsGroup = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(0, 0, 20, 8),
+            Children = { Label("Ports"), _ports, presets, _listShares } };
+        var findGroup = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(0, 0, 0, 8),
+            Children = { _search, export } };
+        var portsRow = new WrapPanel { Margin = new Thickness(14, 0, 14, 0), Children = { portsGroup, findGroup } };
         foreach (var c in new Control[] { _showAlive, _showDead, _showUnknown, _favoritesOnly })
         {
             c.Margin = new Thickness(0, 0, 18, 4);
             filters.Children.Add(c);
         }
-        var statusBar = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12, Margin = new Thickness(14, 6), Children = { _progress, _status } };
+        _progress.Margin = new Thickness(0, 0, 12, 0);
+        _progress.VerticalAlignment = VerticalAlignment.Center;
+        DockPanel.SetDock(_progress, Dock.Left);
+        var statusBar = new DockPanel { Margin = new Thickness(14, 6), Children = { _progress, _status } };
 
         var table = new Grid { RowDefinitions = new RowDefinitions("Auto,*"), ClipToBounds = true };
         _header = Header();
@@ -204,6 +212,10 @@ public sealed class ScannerView : UserControl
         DockPanel.SetDock(detailsPane, Dock.Right);
         main.Children.Add(detailsPane);
         main.Children.Add(table);
+
+        // Narrow windows: the table needs the room more than the details pane (details stay one click away via
+        // right-click and hover), so the pane hides below 760 px.
+        main.SizeChanged += (_, e) => detailsPane.IsVisible = e.NewSize.Width >= 760;
 
         var root = new DockPanel();
         DockPanel.SetDock(toolbar, Dock.Top);
@@ -473,7 +485,10 @@ public sealed class ScannerView : UserControl
             _ => 0,
         };
         if (c == 0) c = a.SortKey.CompareTo(b.SortKey); // IP order breaks ties
-        return _descending ? -c : c;
+        if (_descending) c = -c;
+        // Devices with any of the ports you asked for always come first, whatever the sort.
+        var wanted = HasWantedPort(b).CompareTo(HasWantedPort(a));
+        return wanted != 0 ? wanted : c;
     }
 
     private void SortBy(SortColumn column)
@@ -701,11 +716,12 @@ public sealed class ScannerView : UserControl
         ];
         for (var i = 0; i < columns.Length; i++)
         {
-            if (_compact && WideOnly.Contains(i)) continue;
+            if (Hidden(i)) continue;
             var (text, column) = columns[i];
             var button = new Button
             {
-                Content = text, Classes = { "quiet" }, Padding = new Thickness(0, 8), FontSize = 12, Foreground = Palette.Slate,
+                Content = new TextBlock { Text = text, TextTrimming = TextTrimming.CharacterEllipsis },
+                Classes = { "quiet" }, Padding = new Thickness(0, 8, 8, 8), FontSize = 12, Foreground = Palette.Slate,
                 FontWeight = FontWeight.Bold, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Left,
             };
             button.Click += (_, _) => SortBy(column);
@@ -715,7 +731,7 @@ public sealed class ScannerView : UserControl
         return grid;
     }
 
-    private Grid Row(HostResult h)
+    private Control Row(HostResult h)
     {
         var grid = new Grid { ColumnDefinitions = new ColumnDefinitions(ColumnWidths) };
         var (label, brush) = h.Status switch
@@ -731,7 +747,7 @@ public sealed class ScannerView : UserControl
         ];
         for (var i = 0; i < cells.Length; i++)
         {
-            if (_compact && WideOnly.Contains(i)) continue;
+            if (Hidden(i)) continue;
             var block = new TextBlock { Text = cells[i] ?? "", TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
             if (i == 0) block.Foreground = StarBrush;
             else if (h.Status == HostStatus.Dead) block.Foreground = DeadBrush;
@@ -743,10 +759,22 @@ public sealed class ScannerView : UserControl
                 Grid.SetColumn(dot, 1);
                 grid.Children.Add(dot);
             }
+            if (i == 7 && HasWantedPort(h)) { block.Foreground = Palette.Teal; block.FontWeight = FontWeight.Bold; }
             Grid.SetColumn(block, i);
             grid.Children.Add(block);
         }
-        return grid;
+        // The row fills the list item edge to edge (cancelling the item's 12,9 padding), so a tint covers the whole row.
+        var row = new Border { Padding = new Thickness(12, 9), Margin = new Thickness(-12, -9), Child = grid };
+        if (HasWantedPort(h))
+        {
+            // Light teal row with a teal bar: "this device has a port you're looking for".
+            row.Background = WantedRowBrush;
+            row.BorderBrush = Palette.Teal;
+            row.BorderThickness = new Thickness(3, 0, 0, 0);
+            row.Padding = new Thickness(9, 9, 12, 9); // keep text where it is despite the 3 px bar
+            ToolTip.SetTip(row, "Has a port you scanned for: " + string.Join(", ", h.OpenPorts.Where(p => p.Confirmed).Select(p => p.Label)));
+        }
+        return row;
     }
 
     private void ShowDetails()
@@ -801,6 +829,11 @@ public sealed class ScannerView : UserControl
         item.Click += (_, _) => click();
         return item;
     }
+
+    /// <summary>True when the port scan found one of the ports the user asked for open on this device.</summary>
+    private static bool HasWantedPort(HostResult h) => h.OpenPorts.Any(p => p.Confirmed);
+
+    private static readonly IBrush WantedRowBrush = new SolidColorBrush(Color.Parse("#EEF4F5"));
 
     /// <summary>Table text: open port numbers when a port scan ran (answered ports only), else the service names.</summary>
     private static string ServicesText(HostResult h) => h.OpenPorts.Any(p => p.Confirmed)

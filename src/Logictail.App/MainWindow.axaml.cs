@@ -60,6 +60,7 @@ public partial class MainWindow : Window
         {
             Current?.MarkSeen();
             FileList.SelectedItem = Current?.SidebarItem;
+            foreach (var t in _tabs) t.IsCurrent = t == Current;
             UpdateChrome();
             // Focus after layout so keyboard scrolling works without clicking first.
             if (Current is { } tab) Dispatcher.UIThread.Post(() => tab.View.Focus(), DispatcherPriority.Loaded);
@@ -74,6 +75,7 @@ public partial class MainWindow : Window
 
         PositionChanged += (_, _) => { if (WindowState == WindowState.Normal) _normalPosition = Position; };
         Resized += (_, _) => { if (WindowState == WindowState.Normal) _normalSize = ClientSize; };
+        SizeChanged += (_, e) => AutoSidebar(e.NewSize.Width);
         Closing += (_, _) => SaveOnExit();
 
         ApplySettings();
@@ -119,6 +121,7 @@ public partial class MainWindow : Window
         UpdateTabStrip();
         // The first file is auto-selected before its sidebar entry exists, so sync the sidebar here too.
         FileList.SelectedItem = Current?.SidebarItem;
+        foreach (var t in _tabs) t.IsCurrent = t == Current;
         if (_tabs.Count > 0) ShowPage(logs: true);
         UpdateChrome();
     }
@@ -140,13 +143,36 @@ public partial class MainWindow : Window
 
     private void OnNavNetwork(object? sender, RoutedEventArgs e) => ShowPage(logs: false);
 
+    private bool _sidebarSetByUser;
+
     /// <summary>Folds the sidebar to a 50 px icon rail, as LogicERP does.</summary>
     private void OnToggleSidebar(object? sender, RoutedEventArgs e)
     {
-        _sidebarCollapsed = !_sidebarCollapsed;
+        _sidebarSetByUser = true;
+        SetSidebar(!_sidebarCollapsed);
+    }
+
+    /// <summary>Narrow windows fold the sidebar automatically (unless the user chose), so toolbars keep their room.</summary>
+    private void AutoSidebar(double width)
+    {
+        if (_sidebarSetByUser) return;
+        var collapse = width < 820;
+        if (collapse != _sidebarCollapsed) SetSidebar(collapse);
+    }
+
+    private void SetSidebar(bool collapsed)
+    {
+        _sidebarCollapsed = collapsed;
         Sidebar.Width = _sidebarCollapsed ? 50 : 220;
         NavLogsText.IsVisible = NavNetworkText.IsVisible = !_sidebarCollapsed;
         FileList.IsVisible = OpenFileButton.IsVisible = !_sidebarCollapsed;
+    }
+
+    private void OnTailButton(object? sender, RoutedEventArgs e)
+    {
+        if (Current is { } tab) tab.View.FollowTail = !tab.View.FollowTail;
+        UpdateChrome();
+        Current?.View.Focus();
     }
 
     private void OnFollowToggle(object? sender, RoutedEventArgs e)
@@ -269,12 +295,19 @@ public partial class MainWindow : Window
         FollowToggle.IsVisible = LogsPage.IsVisible && Current is not null;
         if (Current is not { } tab)
         {
+            TailButton.IsVisible = false;
             Title = "Logictail";
             StatusText.Text = "Open a file to start: Ctrl+O, or drop it here.";
             FollowTailItem.IsChecked = false;
             return;
         }
         FollowToggle.IsChecked = tab.View.FollowTail;
+        TailButton.IsVisible = true;
+        TailText.Text = tab.View.FollowTail ? "Pause" : "Follow tail";
+        TailIcon.Data = Avalonia.Media.Geometry.Parse(tab.View.FollowTail
+            ? "M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"                               // pause bars
+            : "M11 4h2v12.2l4.6-4.6 1.4 1.4-7 7-7-7 1.4-1.4 4.6 4.6z");        // arrow to the end
+        TailButton.Classes.Set("primary", !tab.View.FollowTail);
         FollowToggle.Content = tab.View.FollowTail ? "Following" : "Paused";
         var f = tab.File;
         Title = $"{f.Name} - Logictail";

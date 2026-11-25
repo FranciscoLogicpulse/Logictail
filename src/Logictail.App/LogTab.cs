@@ -67,6 +67,15 @@ public sealed class LogTab
     public Control SidebarItem { get; }
     public FileStatus Status { get; private set; } = FileStatus.Unknown;
 
+    private bool _isCurrent;
+
+    /// <summary>The file shown in the log view: its sidebar entry is teal and bold.</summary>
+    public bool IsCurrent
+    {
+        get => _isCurrent;
+        set { if (_isCurrent == value) return; _isCurrent = value; UpdateHeader(); }
+    }
+
     /// <summary>Set when the tab is closed so a running index loop stops.</summary>
     public bool IsClosed { get; set; }
 
@@ -134,8 +143,9 @@ public sealed class LogTab
 
         if (Status != FileStatus.Changed && Status != FileStatus.Error) _seenLines = File.LineCount;
         _sideName.Text = File.Name;
-        _sideName.FontWeight = Status == FileStatus.Changed ? FontWeight.Bold : FontWeight.Normal;
-        _sideName.Foreground = Status == FileStatus.Error ? Palette.Red : Palette.Charcoal;
+        // Only set what the state needs; otherwise leave it to the styles (selected file = teal bold).
+        _sideName.FontWeight = Status == FileStatus.Changed || IsCurrent ? FontWeight.Bold : FontWeight.Normal;
+        _sideName.Foreground = Status == FileStatus.Error ? Palette.Red : IsCurrent ? Palette.Teal : Palette.Charcoal;
         _sideBar.Background = Status switch
         {
             FileStatus.Changed => Palette.Teal,
