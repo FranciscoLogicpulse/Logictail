@@ -168,6 +168,32 @@ public sealed class ScannerUiTests
     }
 
     [AvaloniaFact]
+    public void From_and_to_with_prefix_prediction()
+    {
+        var view = new ScannerView(new FakeProbes(), VendorFile, HostStore.InMemory()) { RangeText = "" };
+        var window = new Window { Content = view };
+        window.Show();
+        var boxes = window.GetVisualDescendants().OfType<TextBox>().ToList();
+        var from = boxes.Single(b => b.PlaceholderText == "192.168.1.1");
+        var to = boxes.Single(b => b.PlaceholderText?.EndsWith("254") == true && b != from);
+
+        from.Text = "10.20.30.5";
+        Pump();
+        Assert.Equal("10.20.30.254", to.PlaceholderText);
+        Assert.Equal("10.20.30.5", view.RangeText);          // To untouched: single address
+        to.Focus();
+        Pump();
+        Assert.Equal("10.20.30.", to.Text);                   // predicted prefix on focus
+        Assert.Equal("10.20.30.5", view.RangeText);          // still just the prefix: not a range yet
+        to.Text = "10.20.30.40";
+        Assert.Equal("10.20.30.5-10.20.30.40", view.RangeText);
+
+        view.RangeText = "192.168.1.1-192.168.1.254";
+        Assert.Equal(("192.168.1.1", "192.168.1.254"), (from.Text, to.Text));
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public async Task Bad_range_shows_an_error_and_does_not_scan()
     {
         var (window, view) = await Open(new FakeProbes(), "10.0.0.999");

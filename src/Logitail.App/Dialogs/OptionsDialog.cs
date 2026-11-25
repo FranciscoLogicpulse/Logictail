@@ -96,7 +96,7 @@ public sealed class OptionsDialog : Window
 
         var defaults = new Button { Content = "_Restore Defaults" };
         defaults.Click += (_, _) => Load(new AppSettings());
-        var ok = new Button { Content = "OK", IsDefault = true, MinWidth = 80 };
+        var ok = new Button { Content = "OK", IsDefault = true, MinWidth = 80, Classes = { "primary" } };
         var cancel = new Button { Content = "Cancel", IsCancel = true, MinWidth = 80 };
         ok.Click += (_, _) => Close(Build());
         cancel.Click += (_, _) => Close(null);

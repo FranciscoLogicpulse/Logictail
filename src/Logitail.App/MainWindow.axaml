@@ -1,57 +1,114 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:app="clr-namespace:Logitail.App"
         x:Class="Logitail.App.MainWindow"
-        Title="Logitail" Width="1100" Height="700"
+        Title="Logitail" Width="1180" Height="720" MinWidth="640" MinHeight="400"
+        Background="{StaticResource Canvas}"
         DragDrop.AllowDrop="True">
   <DockPanel>
-    <Menu x:Name="MainMenu" DockPanel.Dock="Top">
-      <MenuItem Header="_File">
-        <MenuItem Header="_Open..." InputGesture="Ctrl+O" Click="OnOpen" />
-        <MenuItem x:Name="RecentMenu" Header="Open Recent _File" />
-        <Separator />
-        <MenuItem Header="_Close" InputGesture="Ctrl+W" Click="OnClose" />
-        <MenuItem Header="Close O_thers" Click="OnCloseOthers" />
-        <MenuItem Header="Close _All" Click="OnCloseAll" />
-        <Separator />
-        <MenuItem Header="E_xit" Click="OnExit" />
-      </MenuItem>
-      <MenuItem Header="_Edit">
-        <MenuItem Header="_Copy" InputGesture="Ctrl+C" Click="OnCopy" />
-      </MenuItem>
-      <MenuItem Header="_View">
-        <MenuItem x:Name="FollowTailItem" Header="Follow _Tail" InputGesture="Ctrl+T" ToggleType="CheckBox" Click="OnToggleFollow" />
-        <MenuItem x:Name="EncodingMenu" Header="_Encoding" />
-        <Separator />
-        <MenuItem x:Name="OnTopItem" Header="Always on To_p" ToggleType="CheckBox" Click="OnToggleOnTop" />
-        <MenuItem Header="_Hide Main Menu" InputGesture="Ctrl+M" Click="OnHideMenu" />
-        <Separator />
-        <MenuItem Header="_Top Half" Click="OnTile" Tag="2,0" />
-        <MenuItem Header="_Bottom Half" Click="OnTile" Tag="2,1" />
-        <MenuItem Header="_1 Top Third" Click="OnTile" Tag="3,0" />
-        <MenuItem Header="_2 Middle Third" Click="OnTile" Tag="3,1" />
-        <MenuItem Header="_3 Bottom Third" Click="OnTile" Tag="3,2" />
-        <MenuItem Header="A_utomatically Size" Click="OnAutoSize" />
-      </MenuItem>
-      <MenuItem Header="_Preferences">
-        <MenuItem Header="_Options..." Click="OnOptions" />
-        <MenuItem Header="_Highlighting..." Click="OnHighlighting" />
-        <Separator />
-        <MenuItem Header="_Load from File..." Click="OnLoadSettings" />
-        <MenuItem Header="_Save to File..." Click="OnSaveSettings" />
-      </MenuItem>
-      <MenuItem Header="_Help">
-        <MenuItem Header="Command Line _Usage" Click="OnUsage" />
-        <MenuItem Header="_About Logitail" Click="OnAbout" />
-      </MenuItem>
-    </Menu>
-    <Border x:Name="LogStatusBar" DockPanel.Dock="Bottom" BorderThickness="0,1,0,0" BorderBrush="#ddd" Padding="8,3">
-      <TextBlock x:Name="StatusText" Text="Open a file to view (Ctrl+O or drag and drop)" TextTrimming="CharacterEllipsis" />
+    <!-- Header: 56 px, white, rule below (LogicERP .portal_header). -->
+    <Border DockPanel.Dock="Top" Height="56" Background="{StaticResource Paper}"
+            BorderBrush="{StaticResource Rule}" BorderThickness="0,0,0,1">
+      <DockPanel Margin="8,0,16,0">
+        <Button x:Name="SidebarToggle" Classes="quiet" Width="40" Height="40" Click="OnToggleSidebar"
+                ToolTip.Tip="Collapse or expand the sidebar" VerticalAlignment="Center">
+          <PathIcon Data="{x:Static app:Palette.IconMenu}" Width="20" Height="20" Foreground="{StaticResource Charcoal}" />
+        </Button>
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,20,0" Spacing="8">
+          <!-- Logitail's mark: a cursor bar, the line a tail is always waiting at. -->
+          <Border Width="4" Height="20" CornerRadius="2" Background="{StaticResource Teal}" />
+          <TextBlock Text="Logitail" FontSize="17" FontWeight="Bold" VerticalAlignment="Center" />
+        </StackPanel>
+        <ToggleButton x:Name="FollowToggle" DockPanel.Dock="Right" Classes="pill" Content="Following"
+                      VerticalAlignment="Center" Click="OnFollowToggle" ToolTip.Tip="Follow new lines as they arrive (Ctrl+T)" />
+        <Menu x:Name="MainMenu" VerticalAlignment="Center">
+          <MenuItem Header="_File">
+            <MenuItem Header="_Open..." InputGesture="Ctrl+O" Click="OnOpen" />
+            <MenuItem x:Name="RecentMenu" Header="Open recent _file" />
+            <Separator />
+            <MenuItem Header="_Close" InputGesture="Ctrl+W" Click="OnClose" />
+            <MenuItem Header="Close o_thers" Click="OnCloseOthers" />
+            <MenuItem Header="Close _all" Click="OnCloseAll" />
+            <Separator />
+            <MenuItem Header="E_xit" Click="OnExit" />
+          </MenuItem>
+          <MenuItem Header="_Edit">
+            <MenuItem Header="_Copy" InputGesture="Ctrl+C" Click="OnCopy" />
+          </MenuItem>
+          <MenuItem Header="_View">
+            <MenuItem x:Name="FollowTailItem" Header="Follow _tail" InputGesture="Ctrl+T" ToggleType="CheckBox" Click="OnToggleFollow" />
+            <MenuItem x:Name="EncodingMenu" Header="_Encoding" />
+            <Separator />
+            <MenuItem x:Name="OnTopItem" Header="Always on to_p" ToggleType="CheckBox" Click="OnToggleOnTop" />
+            <MenuItem Header="_Hide menu" InputGesture="Ctrl+M" Click="OnHideMenu" />
+            <Separator />
+            <MenuItem Header="_Top half" Click="OnTile" Tag="2,0" />
+            <MenuItem Header="_Bottom half" Click="OnTile" Tag="2,1" />
+            <MenuItem Header="_1 Top third" Click="OnTile" Tag="3,0" />
+            <MenuItem Header="_2 Middle third" Click="OnTile" Tag="3,1" />
+            <MenuItem Header="_3 Bottom third" Click="OnTile" Tag="3,2" />
+            <MenuItem Header="A_utomatic size" Click="OnAutoSize" />
+          </MenuItem>
+          <MenuItem Header="_Preferences">
+            <MenuItem Header="_Options..." Click="OnOptions" />
+            <MenuItem Header="_Highlighting..." Click="OnHighlighting" />
+            <Separator />
+            <MenuItem Header="_Load from file..." Click="OnLoadSettings" />
+            <MenuItem Header="_Save to file..." Click="OnSaveSettings" />
+          </MenuItem>
+          <MenuItem Header="_Help">
+            <MenuItem Header="Command line _usage" Click="OnUsage" />
+            <MenuItem Header="_About Logitail" Click="OnAbout" />
+          </MenuItem>
+        </Menu>
+      </DockPanel>
     </Border>
-    <TabControl x:Name="Modes" Padding="0">
-      <TabItem Header="Logs">
-        <TabControl x:Name="Tabs" Padding="0" />
-      </TabItem>
-      <TabItem x:Name="NetworkTab" Header="Network" />
-    </TabControl>
+
+    <!-- Sidebar: 220 px, folds to a 50 px rail (LogicERP SfSidebar). -->
+    <Border x:Name="Sidebar" DockPanel.Dock="Left" Width="220" Background="{StaticResource Paper}"
+            BorderBrush="{StaticResource Rule}" BorderThickness="0,0,1,0">
+      <StackPanel Margin="0,12,0,0">
+        <Button x:Name="NavLogs" Classes="nav active" Click="OnNavLogs" ToolTip.Tip="Logs">
+          <StackPanel Orientation="Horizontal" Spacing="12">
+            <PathIcon Data="{x:Static app:Palette.IconLogs}" Width="18" Height="18" Foreground="{StaticResource Charcoal}" />
+            <TextBlock x:Name="NavLogsText" Text="Logs" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
+        <ListBox x:Name="FileList" Classes="files" Background="Transparent" Margin="0,2,0,0" MaxHeight="420" />
+        <Button x:Name="OpenFileButton" Classes="quiet" Click="OnOpen" HorizontalAlignment="Stretch"
+                HorizontalContentAlignment="Left" Padding="46,6,12,6" Margin="0,0,0,10">
+          <TextBlock Text="Open a file..." Foreground="{StaticResource Teal}" FontWeight="Bold" />
+        </Button>
+        <Button x:Name="NavNetwork" Classes="nav" Click="OnNavNetwork" ToolTip.Tip="Network">
+          <StackPanel Orientation="Horizontal" Spacing="12">
+            <PathIcon Data="{x:Static app:Palette.IconNetwork}" Width="18" Height="18" Foreground="{StaticResource Charcoal}" />
+            <TextBlock x:Name="NavNetworkText" Text="Network" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
+      </StackPanel>
+    </Border>
+
+    <!-- Content: one white panel on the canvas. -->
+    <Border Margin="16" Background="{StaticResource Paper}" BorderBrush="#E4E4E4" BorderThickness="1"
+            CornerRadius="8" BoxShadow="0 1 4 0 #10000000" ClipToBounds="True">
+      <Panel>
+        <DockPanel x:Name="LogsPage">
+          <Border x:Name="LogStatusBar" DockPanel.Dock="Bottom" BorderThickness="0,1,0,0"
+                  BorderBrush="{StaticResource Rule}" Padding="14,6">
+            <TextBlock x:Name="StatusText" FontSize="12" Foreground="{StaticResource Slate}"
+                       Text="Open a file to start: Ctrl+O, or drop it here." TextTrimming="CharacterEllipsis" />
+          </Border>
+          <Panel>
+            <TabControl x:Name="Tabs" Padding="0" />
+            <StackPanel x:Name="EmptyLogs" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="12">
+              <TextBlock Text="No log open" FontSize="15" FontWeight="Bold" HorizontalAlignment="Center" />
+              <TextBlock Text="Drop a file here, or open one to follow it as it grows." Foreground="{StaticResource Slate}" HorizontalAlignment="Center" />
+              <Button Classes="primary" Content="Open a file" HorizontalAlignment="Center" Click="OnOpen" Padding="16,8" />
+            </StackPanel>
+          </Panel>
+        </DockPanel>
+        <ContentControl x:Name="NetworkPage" IsVisible="False" />
+      </Panel>
+    </Border>
   </DockPanel>
 </Window>

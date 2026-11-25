@@ -176,6 +176,7 @@ public sealed class DeviceTypeTests
     public void Services_beat_the_vendor()
     {
         Assert.Equal(DeviceType.Computer, DeviceTypes.Guess(Host("Apple, Inc.", ServiceKind.Smb)));   // a Mac, not a phone
+        Assert.Equal(DeviceType.Computer, DeviceTypes.Guess(Host("Hewlett Packard", ServiceKind.Smb))); // an HP laptop, not a printer
         Assert.Equal(DeviceType.Computer, DeviceTypes.Guess(Host("Synology Incorporated", ServiceKind.Rdp)));
         var printer = Host(null) with { Shares = [new SharedResource("Laser", ShareKind.Printer, null)] };
         Assert.Equal(DeviceType.Printer, DeviceTypes.Guess(printer));

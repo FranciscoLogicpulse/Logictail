@@ -42,7 +42,8 @@ public sealed class AppSettings
 
     // Tabs
     public TabStripPosition TabPosition { get; set; } = TabStripPosition.Top;
-    public TabShowMode ShowTabs { get; set; } = TabShowMode.AtLeastOne;
+    /// <summary>Small file tabs above the log when more than one file is open (the sidebar lists them too).</summary>
+    public TabShowMode ShowTabs { get; set; } = TabShowMode.AtLeastTwo;
 
     // Window
     public bool AlwaysOnTop { get; set; }
@@ -64,9 +65,10 @@ public sealed class AppSettings
 
     public static List<HighlightRule> DefaultRules() =>
     [
-        new() { Pattern = "error", Foreground = 0xFFFFFFFF, Background = 0xFFC62828 },
-        new() { Pattern = "exception", Foreground = 0xFFFFFFFF, Background = 0xFFC62828 },
-        new() { Pattern = "warn", Foreground = 0xFF000000, Background = 0xFFFFE082 },
+        // Tinted rows with dark text: readable for hours, colors from LogicERP's status palette.
+        new() { Pattern = "error", Foreground = 0xFF8A2A1B, Background = 0xFFFBE1DC },
+        new() { Pattern = "exception", Foreground = 0xFF8A2A1B, Background = 0xFFFBE1DC },
+        new() { Pattern = "warn", Foreground = 0xFF7A4A12, Background = 0xFFFDEBDD },
     ];
 
     /// <summary>Adds a file to the top of the recent list.</summary>

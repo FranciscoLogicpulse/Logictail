@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
@@ -17,6 +18,10 @@ public sealed class LogTab
     private readonly long _bytesPerStep;
 
     private readonly TextBlock _header = new();
+    private readonly TextBlock _sideName = new() { TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center };
+    private readonly TextBlock _sideBadge = new() { FontSize = 11, FontWeight = FontWeight.Bold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
+    private readonly Border _sideBar = new() { Width = 3, CornerRadius = new CornerRadius(2), Margin = new Thickness(0, 4, 10, 4) };
+    private int _seenLines;
     private readonly ScrollBar _vScroll = new() { Orientation = Orientation.Vertical };
     private readonly ScrollBar _hScroll = new() { Orientation = Orientation.Horizontal };
     private bool _refreshing;
@@ -26,7 +31,7 @@ public sealed class LogTab
     {
         _bytesPerStep = bytesPerStep;
         File = new LogFile(path);
-        View = new LogView { File = File, Rules = rules };
+        View = new LogView { File = File, Rules = rules, Margin = new Thickness(0, 6, 0, 0) };
         View.ApplySettings(settings);
 
         var grid = new Grid
@@ -41,6 +46,14 @@ public sealed class LogTab
         grid.Children.Add(_hScroll);
 
         Tab = new TabItem { Header = _header, Content = grid, Tag = this };
+        // Sidebar entry: bar | name | new-line count. Indented under "Logs".
+        var side = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), Margin = new Thickness(27, 0, 4, 0), Tag = this, Height = 26 };
+        side.Children.Add(_sideBar);
+        Grid.SetColumn(_sideName, 1);
+        side.Children.Add(_sideName);
+        Grid.SetColumn(_sideBadge, 2);
+        side.Children.Add(_sideBadge);
+        SidebarItem = side;
         View.ViewChanged += (_, _) => SyncScrollBars();
         _vScroll.Scroll += (_, e) => { if (!_syncing) View.ScrollTo((int)e.NewValue, fromUser: true); };
         _hScroll.Scroll += (_, e) => { if (!_syncing) View.ScrollHorizontally(e.NewValue); };
@@ -50,6 +63,8 @@ public sealed class LogTab
     public LogFile File { get; }
     public LogView View { get; }
     public TabItem Tab { get; }
+    /// <summary>The file's entry in the sidebar list.</summary>
+    public Control SidebarItem { get; }
     public FileStatus Status { get; private set; } = FileStatus.Unknown;
 
     /// <summary>Set when the tab is closed so a running index loop stops.</summary>
@@ -98,8 +113,12 @@ public sealed class LogTab
     public void MarkSeen()
     {
         if (Status == FileStatus.Changed) Status = FileStatus.Unchanged;
+        _seenLines = File.LineCount;
         UpdateHeader();
     }
+
+    /// <summary>Lines added since the user last looked at this file.</summary>
+    public int NewLines => Status == FileStatus.Changed ? Math.Max(0, File.LineCount - _seenLines) : 0;
 
     private void UpdateHeader()
     {
@@ -110,7 +129,27 @@ public sealed class LogTab
             case FileStatus.Error: _header.Foreground = Brushes.Red; break;
             default: _header.ClearValue(TextBlock.ForegroundProperty); break; // keep the theme's color
         }
-        _header.FontWeight = Status == FileStatus.Changed ? FontWeight.Bold : FontWeight.Normal;
+        if (Status == FileStatus.Changed) _header.FontWeight = FontWeight.Bold;
+        else _header.ClearValue(TextBlock.FontWeightProperty); // let the selected-tab style make it bold
+
+        if (Status != FileStatus.Changed && Status != FileStatus.Error) _seenLines = File.LineCount;
+        _sideName.Text = File.Name;
+        _sideName.FontWeight = Status == FileStatus.Changed ? FontWeight.Bold : FontWeight.Normal;
+        _sideName.Foreground = Status == FileStatus.Error ? Palette.Red : Palette.Charcoal;
+        _sideBar.Background = Status switch
+        {
+            FileStatus.Changed => Palette.Teal,
+            FileStatus.Error => Palette.Red,
+            _ => Brushes.Transparent,
+        };
+        _sideBadge.Foreground = Status == FileStatus.Error ? Palette.Red : Palette.Teal;
+        _sideBadge.Text = Status switch
+        {
+            FileStatus.Error => "!",
+            FileStatus.Changed when NewLines > 0 => NewLines > 9999 ? "9999+" : $"+{NewLines:N0}",
+            _ => "",
+        };
+        ToolTip.SetTip(SidebarItem, File.Error is { } e ? $"{File.Path}\n{e}" : $"{File.Path}\n{FormatSize(File.Length)}");
         ToolTip.SetTip(Tab, File.Error is { } err ? $"{File.Path}\n{err}" : File.Path);
     }
 

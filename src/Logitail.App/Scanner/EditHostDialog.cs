@@ -22,7 +22,7 @@ public sealed class EditHostDialog : Window
         var mac = new TextBox { Text = note?.Mac ?? (host.Mac is null ? null : ""), PlaceholderText = host.Mac ?? "00-11-22-33-44-55 (for Wake-on-LAN)", IsEnabled = host.Mac is null };
         var error = new TextBlock { Foreground = Brushes.Firebrick };
 
-        var ok = new Button { Content = "OK", IsDefault = true, MinWidth = 80 };
+        var ok = new Button { Content = "OK", IsDefault = true, MinWidth = 80, Classes = { "primary" } };
         var cancel = new Button { Content = "Cancel", IsCancel = true, MinWidth = 80 };
         ok.Click += (_, _) =>
         {

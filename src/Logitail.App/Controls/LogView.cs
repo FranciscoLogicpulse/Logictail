@@ -15,10 +15,10 @@ namespace Logitail.App.Controls;
 /// </summary>
 public sealed class LogView : Control
 {
-    private const double LeftPad = 4;
+    private const double LeftPad = 10;
     private const int MaxCopyLines = 200_000;
-    private static readonly IBrush SelectionBrush = new SolidColorBrush(Color.FromRgb(0x33, 0x66, 0xCC));
-    private static readonly IBrush MarkerBrush = new SolidColorBrush(Color.FromRgb(0xB0, 0xB0, 0xB0));
+    private static readonly IBrush SelectionBrush = Palette.Teal;
+    private static readonly IBrush MarkerBrush = Palette.TealLight;
 
     private AppSettings _settings = new();
     private Typeface _typeface;
@@ -165,7 +165,7 @@ public sealed class LogView : Control
             var rowCount = TextLayout.RowCount(text.Length, columns);
             var height = rowCount * _rowHeight;
 
-            IBrush fg = Brushes.Black;
+            IBrush fg = Palette.Charcoal;
             var weight = FontWeight.Normal;
             var style = FontStyle.Normal;
             if (selected)

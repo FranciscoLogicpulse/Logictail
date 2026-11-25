@@ -63,14 +63,19 @@ public sealed class UiTests : IDisposable
         window.Show();
         var view = window.GetVisualDescendants().OfType<Controls.LogView>().Single();
         await WaitFor(() => view.File!.LineCount == 4);
+        Assert.NotNull(window.FindControl<ListBox>("FileList")!.SelectedItem); // single file: highlighted in the sidebar
         Pump();
 
         // Click line 2, shift+click line 3.
-        window.MouseDown(new Point(60, view.TranslatePoint(new Point(0, 0), window)!.Value.Y + 25), MouseButton.Left);
-        window.MouseUp(new Point(60, view.TranslatePoint(new Point(0, 0), window)!.Value.Y + 25), MouseButton.Left);
-        var y3 = view.TranslatePoint(new Point(0, 0), window)!.Value.Y + 42;
-        window.MouseDown(new Point(60, y3), MouseButton.Left, RawInputModifiers.Shift);
-        window.MouseUp(new Point(60, y3), MouseButton.Left, RawInputModifiers.Shift);
+        var origin = view.TranslatePoint(new Point(0, 0), window)!.Value;
+        var rowHeight = view.Bounds.Height / view.VisibleRows; // approx; rows start at the top of the view
+        var x = origin.X + 60;
+        var y2 = origin.Y + rowHeight * 1.5;
+        var y3 = origin.Y + rowHeight * 2.5;
+        window.MouseDown(new Point(x, y2), MouseButton.Left);
+        window.MouseUp(new Point(x, y2), MouseButton.Left);
+        window.MouseDown(new Point(x, y3), MouseButton.Left, RawInputModifiers.Shift);
+        window.MouseUp(new Point(x, y3), MouseButton.Left, RawInputModifiers.Shift);
         Pump();
         Assert.Equal((1, 2), view.Selection);
         Assert.False(view.FollowTail); // selection turns follow-tail off by default
@@ -178,7 +183,7 @@ public sealed class UiTests : IDisposable
         Pump();
         Assert.Equal(wide, view.ContentWidth);              // the scroll range didn't collapse
         Assert.True(view.HorizontalOffset <= wide);
-        var hBar = window.GetVisualDescendants().OfType<Avalonia.Controls.Primitives.ScrollBar>()
+        var hBar = ((Visual)view.Parent!).GetVisualDescendants().OfType<Avalonia.Controls.Primitives.ScrollBar>()
             .Single(s => s.Orientation == Avalonia.Layout.Orientation.Horizontal);
         Assert.True(hBar.IsVisible);                        // so the user can scroll back
         window.Close();

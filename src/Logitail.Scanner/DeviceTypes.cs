@@ -38,8 +38,8 @@ public static class DeviceTypes
         foreach (var (hint, type) in VendorHints)
         {
             if (!vendor.Contains(hint, StringComparison.OrdinalIgnoreCase)) continue;
-            // Phone vendors also make computers; a phone has no file sharing or SSH.
-            if (type == DeviceType.Phone && (has.Contains(ServiceKind.Smb) || has.Contains(ServiceKind.Ssh))) return DeviceType.Computer;
+            // Phone and printer vendors also make computers: a phone or printer doesn't share files or offer SSH.
+            if (type is DeviceType.Phone or DeviceType.Printer && (has.Contains(ServiceKind.Smb) || has.Contains(ServiceKind.Ssh))) return DeviceType.Computer;
             return type;
         }
         if (vendor.Contains("Microsoft", StringComparison.OrdinalIgnoreCase) && host.Mac?.StartsWith("00-15-5D", StringComparison.OrdinalIgnoreCase) == true)

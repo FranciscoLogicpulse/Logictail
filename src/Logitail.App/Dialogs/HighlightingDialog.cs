@@ -106,7 +106,7 @@ public sealed class HighlightingDialog : Window
             },
         };
 
-        var ok = new Button { Content = "OK", IsDefault = true, MinWidth = 80 };
+        var ok = new Button { Content = "OK", IsDefault = true, MinWidth = 80, Classes = { "primary" } };
         var cancel = new Button { Content = "Cancel", IsCancel = true, MinWidth = 80 };
         ok.Click += (_, _) => Close(_rules.ToList());
         cancel.Click += (_, _) => Close(null);

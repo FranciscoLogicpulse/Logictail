@@ -10,7 +10,7 @@ public static class MessageWindow
 {
     public static Task Show(Window owner, string title, string message, bool monospace = false)
     {
-        var ok = new Button { Content = "OK", IsDefault = true, IsCancel = true, MinWidth = 80, HorizontalAlignment = HorizontalAlignment.Right };
+        var ok = new Button { Content = "OK", IsDefault = true, IsCancel = true, MinWidth = 80, Classes = { "primary" }, HorizontalAlignment = HorizontalAlignment.Right };
         var window = new Window
         {
             Title = title,

@@ -1,0 +1,7 @@
+Montserrat (Regular, Bold)
+Copyright 2011 The Montserrat Project Authors (https://github.com/JulietaUla/Montserrat)
+
+Licensed under the SIL Open Font License, Version 1.1.
+Full license text: https://openfontlicense.org/open-font-license-official-text/
+
+The font files were copied from the LogicERP portal (wwwroot/fonts), which bundles the same upstream release.

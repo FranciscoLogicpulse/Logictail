@@ -17,6 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <AvaloniaResource Include="Assets\**" />
     <!-- IEEE MAC vendor registry, shipped next to the exe -->
     <None Include="..\..\data\oui.csv" Link="data\oui.csv" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

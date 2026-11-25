@@ -44,11 +44,11 @@ public partial class MainWindow : Window
             EncodingMenu.Items.Add(item);
         }
 
-        NetworkTab.Content = new Scanner.ScannerView();
-        Modes.SelectionChanged += (_, e) =>
+        NetworkPage.Content = new Scanner.ScannerView();
+        FileList.SelectionChanged += (_, _) =>
         {
-            if (e.Source != Modes) return; // ignore the inner file tabs' events bubbling up
-            LogStatusBar.IsVisible = Modes.SelectedItem != NetworkTab;
+            if (FileList.SelectedItem is Control { Tag: LogTab tab } && Current != tab) Tabs.SelectedItem = tab.Tab;
+            if (FileList.SelectedItem is not null) ShowPage(logs: true);
         };
 
         Tabs.TemplateApplied += (_, e) =>
@@ -59,6 +59,7 @@ public partial class MainWindow : Window
         Tabs.SelectionChanged += (_, _) =>
         {
             Current?.MarkSeen();
+            FileList.SelectedItem = Current?.SidebarItem;
             UpdateChrome();
             // Focus after layout so keyboard scrolling works without clicking first.
             if (Current is { } tab) Dispatcher.UIThread.Post(() => tab.View.Focus(), DispatcherPriority.Loaded);
@@ -106,14 +107,52 @@ public partial class MainWindow : Window
             tab.View.ViewChanged += (_, _) => { if (tab == Current) UpdateChrome(); };
             tab.View.ContextMenu = ViewContextMenu(tab);
             tab.Tab.ContextMenu = TabContextMenu(tab);
+            tab.SidebarItem.ContextMenu = TabContextMenu(tab);
             _tabs.Add(tab);
             Tabs.Items.Add(tab.Tab);
+            FileList.Items.Add(tab.SidebarItem);
             Tabs.SelectedItem = tab.Tab;
             _settings.AddRecent(full);
             _ = tab.RefreshAsync(true);
         }
         RebuildRecentMenu();
         UpdateTabStrip();
+        // The first file is auto-selected before its sidebar entry exists, so sync the sidebar here too.
+        FileList.SelectedItem = Current?.SidebarItem;
+        if (_tabs.Count > 0) ShowPage(logs: true);
+        UpdateChrome();
+    }
+
+    // --- navigation ---
+
+    private bool _sidebarCollapsed;
+
+    private void ShowPage(bool logs)
+    {
+        LogsPage.IsVisible = logs;
+        NetworkPage.IsVisible = !logs;
+        NavLogs.Classes.Set("active", logs);
+        NavNetwork.Classes.Set("active", !logs);
+        UpdateChrome();
+    }
+
+    private void OnNavLogs(object? sender, RoutedEventArgs e) => ShowPage(logs: true);
+
+    private void OnNavNetwork(object? sender, RoutedEventArgs e) => ShowPage(logs: false);
+
+    /// <summary>Folds the sidebar to a 50 px icon rail, as LogicERP does.</summary>
+    private void OnToggleSidebar(object? sender, RoutedEventArgs e)
+    {
+        _sidebarCollapsed = !_sidebarCollapsed;
+        Sidebar.Width = _sidebarCollapsed ? 50 : 220;
+        NavLogsText.IsVisible = NavNetworkText.IsVisible = !_sidebarCollapsed;
+        FileList.IsVisible = OpenFileButton.IsVisible = !_sidebarCollapsed;
+    }
+
+    private void OnFollowToggle(object? sender, RoutedEventArgs e)
+    {
+        if (Current is { } tab) tab.View.FollowTail = FollowToggle.IsChecked == true;
+        UpdateChrome();
     }
 
     // --- settings ---
@@ -225,13 +264,18 @@ public partial class MainWindow : Window
 
     private void UpdateChrome()
     {
+        EmptyLogs.IsVisible = _tabs.Count == 0;
+        Tabs.IsVisible = _tabs.Count > 0;
+        FollowToggle.IsVisible = LogsPage.IsVisible && Current is not null;
         if (Current is not { } tab)
         {
             Title = "Logitail";
-            StatusText.Text = "Open a file to view (Ctrl+O or drag and drop)";
+            StatusText.Text = "Open a file to start: Ctrl+O, or drop it here.";
             FollowTailItem.IsChecked = false;
             return;
         }
+        FollowToggle.IsChecked = tab.View.FollowTail;
+        FollowToggle.Content = tab.View.FollowTail ? "Following" : "Paused";
         var f = tab.File;
         Title = $"{f.Name} - Logitail";
         var indexing = f.IsFullyIndexed ? "" : "  |  indexing...";
@@ -324,6 +368,7 @@ public partial class MainWindow : Window
         tab.IsClosed = true;
         _tabs.Remove(tab);
         Tabs.Items.Remove(tab.Tab);
+        FileList.Items.Remove(tab.SidebarItem);
         UpdateTabStrip();
         UpdateChrome();
     }

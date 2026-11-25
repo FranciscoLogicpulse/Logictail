@@ -20,24 +20,32 @@ public sealed class ScannerView : UserControl
     private enum SortColumn { Favorite, Status, Name, Address, Manufacturer, Mac, Type, Services, Comment }
 
     // ★, Status, Name, IP, Manufacturer, MAC, Type, Services, Comments
-    private const string ColumnWidths = "24,76,2*,104,2*,136,100,1.5*,1.5*"; // stars share the leftover width
-    private static readonly IBrush AliveBrush = new SolidColorBrush(Color.FromRgb(0x2E, 0x7D, 0x32));
-    private static readonly IBrush DeadBrush = new SolidColorBrush(Color.FromRgb(0x9E, 0x9E, 0x9E));
-    private static readonly IBrush UnknownBrush = new SolidColorBrush(Color.FromRgb(0xEF, 0x6C, 0x00));
-    private static readonly IBrush StarBrush = new SolidColorBrush(Color.FromRgb(0xF9, 0xA8, 0x25));
+    // ★, Status, Name, IP, Manufacturer, MAC, Type, Services, Comments. Stars share the leftover width.
+    private const string WideColumns = "24,28,2*,104,2*,136,100,1.5*,1.5*";
+    private const string CompactColumns = "24,28,2*,104,2*,0,100,1.5*,0";
+    private static readonly int[] WideOnly = [5, 8];
+    private bool _compact;
+    private Grid _header = null!;
+    private string ColumnWidths => _compact ? CompactColumns : WideColumns;
+    private static readonly IBrush AliveBrush = Palette.Green;
+    private static readonly IBrush DeadBrush = Palette.Muted;
+    private static readonly IBrush UnknownBrush = Palette.Orange;
+    private static readonly IBrush StarBrush = Palette.Teal;
 
     private readonly IProbes _probes;
     private readonly HostStore _store;
     private readonly Task<OuiDatabase> _vendors;
-    private readonly TextBox _range = new() { PlaceholderText = "Example: 192.168.0.1-100, 192.168.0.200", MinWidth = 300 };
-    private readonly ComboBox _speed = new() { ItemsSource = new[] { "Fast", "Accurate (slower)" }, SelectedIndex = 0, Width = 150 };
-    private readonly Button _scanButton = new() { Content = "Scan", MinWidth = 80 }; // not IsDefault: Enter in the search box must not start a scan
+    private readonly TextBox _from = new() { PlaceholderText = "192.168.1.1", MinWidth = 140 };
+    private readonly TextBox _to = new() { PlaceholderText = "192.168.1.254", MinWidth = 140 };
+    private string? _predicted; // prefix we filled into "To", so we can update it while the user hasn't typed there
+    private readonly ComboBox _speed = new() { ItemsSource = new[] { "Fast", "Accurate (slower)" }, SelectedIndex = 0, Width = 140 };
+    private readonly Button _scanButton = new() { Content = "Scan", MinWidth = 90, Classes = { "primary" } }; // not IsDefault: Enter in the search box must not start a scan
     private readonly Button _pauseButton = new() { Content = "Pause", MinWidth = 80, IsEnabled = false };
     private readonly CheckBox _showAlive = new() { Content = "Show _alive", IsChecked = true };
     private readonly CheckBox _showDead = new() { Content = "Show _dead", IsChecked = false };
     private readonly CheckBox _showUnknown = new() { Content = "Show _unknown", IsChecked = true };
     private readonly CheckBox _favoritesOnly = new() { Content = "_Favorites only", IsChecked = false };
-    private readonly CheckBox _listShares = new() { Content = "List shared folders", IsChecked = false };
+    private readonly CheckBox _listShares = new() { Content = "Shares", IsChecked = false };
     private readonly TextBox _search = new() { PlaceholderText = "Search results", Width = 220 };
     private readonly ListBox _list = new() { SelectionMode = SelectionMode.Multiple };
     private readonly StackPanel _details = new() { Spacing = 4, Margin = new Thickness(12) };
@@ -45,7 +53,7 @@ public sealed class ScannerView : UserControl
     private readonly TextBlock _status = new() { VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
     private readonly TextBlock _empty = new()
     {
-        Foreground = Brushes.Gray, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, IsHitTestVisible = false,
+        Foreground = Palette.Slate, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, IsHitTestVisible = false,
     };
 
     private readonly List<HostResult> _results = [];
@@ -68,17 +76,33 @@ public sealed class ScannerView : UserControl
         _probes = probes;
         _store = store;
         _vendors = Task.Run(() => OuiDatabase.Load(vendorFile));
-        _range.Text = LocalNetwork.Subnets().FirstOrDefault()?.ToRangeText() ?? "";
+        RangeText = LocalNetwork.Subnets().FirstOrDefault()?.ToRangeText() ?? "";
+        // Predict "To": it almost always shares the first three parts of "From" (192.168.1.x -> 192.168.1.).
+        _from.TextChanged += (_, _) =>
+        {
+            var prefix = Prefix(_from.Text);
+            _to.PlaceholderText = prefix is null ? "192.168.1.254" : prefix + "254";
+            if (string.IsNullOrEmpty(_to.Text) || _to.Text == _predicted) { _to.Text = null; _predicted = null; }
+        };
+        _to.GotFocus += (_, _) =>
+        {
+            if (!string.IsNullOrEmpty(_to.Text) || Prefix(_from.Text) is not { } prefix) return;
+            _to.Text = _predicted = prefix;
+            _to.CaretIndex = prefix.Length;
+        };
 
-        var mySubnet = new Button { Content = "My subnet" };
-        ToolTip.SetTip(mySubnet, "Fill in this PC's own subnet");
-        mySubnet.Click += (_, _) => _range.Text = LocalNetwork.Subnets().FirstOrDefault()?.ToRangeText() ?? _range.Text;
-        var favorites = new Button { Content = "Favorites" };
-        ToolTip.SetTip(favorites, "Fill in the addresses of your favorite devices");
-        favorites.Click += (_, _) => FillFavorites();
-        var fromFile = new Button { Content = "From file..." };
-        ToolTip.SetTip(fromFile, "Load addresses from a text file: one IP, range or host name per line");
-        fromFile.Click += async (_, _) => await LoadTargetsFileAsync();
+        ToolTip.SetTip(_listShares, "Also list shared folders. Windows signs in to each device as you to do this.");
+        // One "Fill range" menu instead of three buttons keeps the toolbar on one line.
+        var fill = new Button { Content = "Fill range" };
+        fill.Flyout = new MenuFlyout
+        {
+            Items =
+            {
+                MenuItem("This PC's subnet", () => RangeText = LocalNetwork.Subnets().FirstOrDefault()?.ToRangeText() ?? RangeText),
+                MenuItem("My favorites", FillFavorites),
+                MenuItem("From a file (one address or range per line)...", async () => await LoadTargetsFileAsync()),
+            },
+        };
         _scanButton.Click += async (_, _) => await ToggleScanAsync();
         _pauseButton.Click += (_, _) => TogglePause();
 
@@ -112,29 +136,49 @@ public sealed class ScannerView : UserControl
             else e.Cancel = true;
         };
 
-        var toolbar = new WrapPanel { Margin = new Thickness(8, 8, 8, 0) };
-        foreach (var c in new Control[] { new TextBlock { Text = "Range:", VerticalAlignment = VerticalAlignment.Center }, _range, mySubnet, favorites, fromFile, _speed, _scanButton, _pauseButton, export })
+        var toolbar = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto,*,Auto,Auto,Auto,Auto,Auto,Auto"), Margin = new Thickness(14, 12, 14, 8) };
+        Control[] tools = [new TextBlock { Text = "From", VerticalAlignment = VerticalAlignment.Center, FontWeight = FontWeight.Bold }, _from,
+            new TextBlock { Text = "To", VerticalAlignment = VerticalAlignment.Center, FontWeight = FontWeight.Bold }, _to, fill, _speed, _listShares, _scanButton, _pauseButton, export];
+        for (var i = 0; i < tools.Length; i++)
         {
-            c.Margin = new Thickness(0, 0, 8, 8);
-            toolbar.Children.Add(c);
+            tools[i].Margin = new Thickness(i == 0 ? 0 : 8, 0, 0, 0);
+            Grid.SetColumn(tools[i], i);
+            toolbar.Children.Add(tools[i]);
         }
-        var filters = new StackPanel
+        // Labels sit close to their own box and apart from the previous one.
+        tools[0].Margin = new Thickness(0, 0, 8, 0);
+        tools[2].Margin = new Thickness(14, 0, 8, 0);
+        tools[1].Margin = tools[3].Margin = new Thickness(0);
+        var filters = new WrapPanel { Margin = new Thickness(14, 0, 14, 8) };
+        foreach (var c in new Control[] { _search, _showAlive, _showDead, _showUnknown, _favoritesOnly })
         {
-            Orientation = Orientation.Horizontal, Spacing = 16, Margin = new Thickness(8, 0, 8, 6),
-            Children = { _showAlive, _showDead, _showUnknown, _favoritesOnly, _search, _listShares },
-        };
-        var statusBar = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12, Margin = new Thickness(8, 4), Children = { _progress, _status } };
+            c.Margin = new Thickness(0, 0, 18, 4);
+            filters.Children.Add(c);
+        }
+        var statusBar = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12, Margin = new Thickness(14, 6), Children = { _progress, _status } };
 
         var table = new Grid { RowDefinitions = new RowDefinitions("Auto,*"), ClipToBounds = true };
-        table.Children.Add(Header());
+        _header = Header();
+        table.Children.Add(_header);
+        // Narrow tables drop the MAC and Comments columns (both stay in the details pane).
+        table.SizeChanged += (_, e) =>
+        {
+            var compact = e.NewSize.Width < 900;
+            if (compact == _compact) return;
+            _compact = compact;
+            table.Children.Remove(_header);
+            _header = Header();
+            table.Children.Insert(0, _header);
+            Rebuild();
+        };
         var body = new Panel { Children = { _list, _empty } };
         Grid.SetRow(body, 1);
         table.Children.Add(body);
 
         var detailsPane = new Border
         {
-            Width = 300,
-            BorderBrush = new SolidColorBrush(Color.FromRgb(0xDD, 0xDD, 0xDD)),
+            Width = 280,
+            BorderBrush = Palette.Rule,
             BorderThickness = new Thickness(1, 0, 0, 0),
             Child = new ScrollViewer { Content = _details },
         };
@@ -148,7 +192,7 @@ public sealed class ScannerView : UserControl
         DockPanel.SetDock(filters, Dock.Top);
         root.Children.Add(toolbar);
         root.Children.Add(filters);
-        var statusBorder = new Border { BorderBrush = new SolidColorBrush(Color.FromRgb(0xDD, 0xDD, 0xDD)), BorderThickness = new Thickness(0, 1, 0, 0), Child = statusBar };
+        var statusBorder = new Border { BorderBrush = Palette.Rule, BorderThickness = new Thickness(0, 1, 0, 0), Child = statusBar };
         DockPanel.SetDock(statusBorder, Dock.Bottom);
         root.Children.Add(statusBorder);
         root.Children.Add(main);
@@ -165,7 +209,41 @@ public sealed class ScannerView : UserControl
 
     public bool IsScanning => _cts is not null;
 
-    public string RangeText { get => _range.Text ?? ""; set => _range.Text = value; }
+    /// <summary>
+    /// The scan input. One range "a-b" fills From and To; anything else (a list, host names) goes into From.
+    /// A "To" that is just a number is the last part of the address (192.168.1.10 to 50).
+    /// </summary>
+    public string RangeText
+    {
+        get
+        {
+            var from = _from.Text?.Trim() ?? "";
+            var to = _to.Text?.Trim() ?? "";
+            return to.Length == 0 || to == _predicted ? from : $"{from}-{to}";
+        }
+        set
+        {
+            _predicted = null;
+            var parsed = IpRangeParser.Parse(value ?? "");
+            if (parsed.Errors.Count == 0 && parsed.Targets is [ScanTarget.Range r] && r.First != r.Last)
+            {
+                _from.Text = IpRangeParser.ToAddress(r.First).ToString();
+                _to.Text = IpRangeParser.ToAddress(r.Last).ToString();
+            }
+            else
+            {
+                _from.Text = value;
+                _to.Text = null;
+            }
+        }
+    }
+
+    /// <summary>"192.168.1." for a complete IPv4 address, else null.</summary>
+    private static string? Prefix(string? ip)
+    {
+        var parts = (ip ?? "").Trim().Split('.');
+        return parts.Length == 4 && parts.All(p => byte.TryParse(p, out _)) ? string.Join('.', parts[..3]) + "." : null;
+    }
 
     public HostResult? Selected => _list.SelectedItem as HostResult;
 
@@ -186,7 +264,7 @@ public sealed class ScannerView : UserControl
     {
         if (_cts is not null) { _cts.Cancel(); return; }
 
-        var parsed = IpRangeParser.Parse(_range.Text ?? "");
+        var parsed = IpRangeParser.Parse(RangeText);
         if (parsed.Errors.Count > 0 || parsed.Targets.Count == 0)
         {
             ShowError(parsed.Errors.Count > 0 ? string.Join("; ", parsed.Errors) : "Enter an IP address, range or host name to scan.");
@@ -253,7 +331,7 @@ public sealed class ScannerView : UserControl
     {
         var addresses = _store.FavoriteAddresses();
         if (addresses.Count == 0) { ShowError("No favorites yet. Right-click a device and choose Add to favorites."); return; }
-        _range.Text = string.Join(", ", addresses);
+        RangeText = string.Join(", ", addresses);
     }
 
     private async Task LoadTargetsFileAsync()
@@ -271,7 +349,7 @@ public sealed class ScannerView : UserControl
             var parsed = IpRangeParser.Parse(text);
             if (parsed.Errors.Count > 0) { ShowError(string.Join("; ", parsed.Errors.Take(5))); return; }
             // Show the file's targets in the box so the user sees what will be scanned.
-            _range.Text = string.Join(", ", text.Split('\n').Select(l => l.Split('#')[0].Trim()).Where(l => l.Length > 0));
+            RangeText = string.Join(", ", text.Split('\n').Select(l => l.Split('#')[0].Trim()).Where(l => l.Length > 0));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -537,17 +615,18 @@ public sealed class ScannerView : UserControl
         var grid = new Grid { ColumnDefinitions = new ColumnDefinitions(ColumnWidths), Margin = new Thickness(12, 0, 8, 0) };
         (string Text, SortColumn Column)[] columns =
         [
-            ("★", SortColumn.Favorite), ("Status", SortColumn.Status), ("Name", SortColumn.Name), ("IP", SortColumn.Address),
+            ("★", SortColumn.Favorite), ("", SortColumn.Status), ("Name", SortColumn.Name), ("IP", SortColumn.Address),
             ("Manufacturer", SortColumn.Manufacturer), ("MAC address", SortColumn.Mac), ("Type", SortColumn.Type),
             ("Services", SortColumn.Services), ("Comments", SortColumn.Comment),
         ];
         for (var i = 0; i < columns.Length; i++)
         {
+            if (_compact && WideOnly.Contains(i)) continue;
             var (text, column) = columns[i];
             var button = new Button
             {
-                Content = text, Background = Brushes.Transparent, Padding = new Thickness(0, 4),
-                FontWeight = FontWeight.SemiBold, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Left,
+                Content = text, Classes = { "quiet" }, Padding = new Thickness(0, 8), FontSize = 12, Foreground = Palette.Slate,
+                FontWeight = FontWeight.Bold, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Left,
             };
             button.Click += (_, _) => SortBy(column);
             Grid.SetColumn(button, i);
@@ -556,14 +635,14 @@ public sealed class ScannerView : UserControl
         return grid;
     }
 
-    private static Grid Row(HostResult h)
+    private Grid Row(HostResult h)
     {
         var grid = new Grid { ColumnDefinitions = new ColumnDefinitions(ColumnWidths) };
         var (label, brush) = h.Status switch
         {
-            HostStatus.Alive => ("● Alive", AliveBrush),
-            HostStatus.Dead => ("○ Dead", DeadBrush),
-            _ => ("? Unknown", UnknownBrush),
+            HostStatus.Alive => ("Alive", AliveBrush),
+            HostStatus.Dead => ("Dead", DeadBrush),
+            _ => ("Unknown", UnknownBrush),
         };
         string?[] cells =
         [
@@ -572,10 +651,18 @@ public sealed class ScannerView : UserControl
         ];
         for (var i = 0; i < cells.Length; i++)
         {
-            var block = new TextBlock { Text = cells[i] ?? "", TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 0, 8, 0) };
+            if (_compact && WideOnly.Contains(i)) continue;
+            var block = new TextBlock { Text = cells[i] ?? "", TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
             if (i == 0) block.Foreground = StarBrush;
-            else if (i == 1) block.Foreground = brush;
             else if (h.Status == HostStatus.Dead) block.Foreground = DeadBrush;
+            if (i == 1)
+            {
+                block.Text = ""; // the dot says it; the word is in the tooltip
+                ToolTip.SetTip(block, label);
+                var dot = new Avalonia.Controls.Shapes.Ellipse { Width = 8, Height = 8, Fill = brush, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };
+                Grid.SetColumn(dot, 1);
+                grid.Children.Add(dot);
+            }
             Grid.SetColumn(block, i);
             grid.Children.Add(block);
         }
@@ -587,15 +674,15 @@ public sealed class ScannerView : UserControl
         _details.Children.Clear();
         if (Selected is not { } h)
         {
-            _details.Children.Add(new TextBlock { Text = "Select a device to see its details.\nRight-click for tools; double-click to add a name or comment.", Foreground = Brushes.Gray, TextWrapping = TextWrapping.Wrap });
+            _details.Children.Add(new TextBlock { Text = "Select a device to see its details.\nRight-click for tools; double-click to add a name or comment.", Foreground = Palette.Slate, TextWrapping = TextWrapping.Wrap });
             return;
         }
 
-        _details.Children.Add(new SelectableTextBlock { Text = h.Name ?? h.Address.ToString(), FontSize = 16, FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap });
+        _details.Children.Add(new SelectableTextBlock { Text = h.Name ?? h.Address.ToString(), FontSize = 15, FontWeight = FontWeight.Bold, TextWrapping = TextWrapping.Wrap });
         void Field(string label, string? value)
         {
             if (string.IsNullOrWhiteSpace(value)) return;
-            _details.Children.Add(new TextBlock { Text = label, Foreground = Brushes.Gray, FontSize = 11, Margin = new Thickness(0, 6, 0, 0) });
+            _details.Children.Add(new TextBlock { Text = label, Foreground = Palette.Slate, FontSize = 11, Margin = new Thickness(0, 6, 0, 0) });
             _details.Children.Add(new SelectableTextBlock { Text = value, TextWrapping = TextWrapping.Wrap });
         }
         Field("Status", h.Status + (h.Error is { } err ? $" ({err})" : ""));
@@ -642,7 +729,7 @@ public sealed class ScannerView : UserControl
 
         var p = _lastProgress;
         _progress.Value = p?.Percent ?? 0;
-        _status.Foreground = Brushes.Black;
+        _status.Foreground = Palette.Slate;
         state ??= _cts is null ? _idleState : _gate?.IsPaused == true ? "Paused" : "Scanning...";
         _status.Text = p is null
             ? state
@@ -652,13 +739,13 @@ public sealed class ScannerView : UserControl
     private void ShowInfo(string message)
     {
         _status.Text = message;
-        _status.Foreground = Brushes.Black;
+        _status.Foreground = Palette.Slate;
     }
 
     private void ShowError(string message)
     {
         _status.Text = message;
-        _status.Foreground = Brushes.Firebrick;
+        _status.Foreground = Palette.Red;
     }
 }
 
