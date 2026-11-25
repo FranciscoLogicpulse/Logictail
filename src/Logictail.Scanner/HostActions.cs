@@ -1,3 +1,4 @@
+using Logictail.Core.Localization;
 using System.Diagnostics;
 using System.Net;
 
@@ -11,7 +12,7 @@ public enum HostAction { Explore, OpenHttp, OpenHttps, OpenHttp8080, OpenFtp, Rd
 /// </summary>
 public static class HostActions
 {
-    public static string Label(HostAction action) => action switch
+    public static string Label(HostAction action) => L._(action switch
     {
         HostAction.Explore => "Explore shares",
         HostAction.OpenHttp => "Open in browser (HTTP)",
@@ -24,7 +25,7 @@ public static class HostActions
         HostAction.Ping => "Ping",
         HostAction.Tracert => "Trace route",
         _ => action.ToString(),
-    };
+    });
 
     /// <summary>True when the host showed the service this action needs (ping and trace route always apply).</summary>
     public static bool Applies(HostAction action, HostResult host)
@@ -71,7 +72,7 @@ public static class HostActions
     {
         // Share names come from the remote host: refuse anything that could change the path.
         if (share.Length == 0 || share.IndexOfAny(['\\', '/', '"', ':', '\0']) >= 0 || share.Contains(".."))
-            throw new ArgumentException($"Refusing unusual share name \"{share}\"", nameof(share));
+            throw new ArgumentException(L.F("Refusing unusual share name \"{0}\"", share), nameof(share));
         return share;
     }
 

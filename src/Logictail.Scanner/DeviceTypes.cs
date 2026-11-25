@@ -1,3 +1,4 @@
+using Logictail.Core.Localization;
 namespace Logictail.Scanner;
 
 public enum DeviceType { Unknown, Router, AccessPoint, Printer, Nas, Computer, Server, Phone, MediaDevice, GameConsole, Camera, VirtualMachine }
@@ -49,7 +50,7 @@ public static class DeviceTypes
         return DeviceType.Unknown;
     }
 
-    public static string Label(DeviceType type) => type switch
+    public static string Label(DeviceType type) => L._(type switch
     {
         DeviceType.AccessPoint => "Access point",
         DeviceType.Nas => "NAS",
@@ -58,5 +59,5 @@ public static class DeviceTypes
         DeviceType.VirtualMachine => "Virtual machine",
         DeviceType.Unknown => "",
         _ => type.ToString(),
-    };
+    });
 }

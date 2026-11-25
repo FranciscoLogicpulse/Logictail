@@ -56,6 +56,39 @@ public sealed class UiTests : IDisposable
     }
 
     [AvaloniaFact]
+    public async Task Ctrl_F_finds_lines_with_Enter_and_Shift_Enter()
+    {
+        var path = WriteLog("alpha\nbravo ERROR here\ncharlie\nerror again\necho\n");
+        var window = new MainWindow(Store(), new AppSettings(), CommandLine.Parse([path]));
+        window.Show();
+        var view = window.GetVisualDescendants().OfType<Controls.LogView>().Single();
+        await WaitFor(() => view.File!.LineCount == 5);
+        Pump();
+        var box = window.FindControl<TextBox>("SearchBox")!;
+
+        window.KeyPress(Key.F, RawInputModifiers.Control, PhysicalKey.F, "f");
+        Pump();
+        Assert.True(box.IsFocused);
+        window.KeyTextInput("error");
+        Pump();
+        Assert.Equal("error", view.SearchText);
+
+        window.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, null);
+        await WaitFor(() => view.Selection == (1, 1));
+        Assert.False(view.FollowTail);
+        window.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, null);
+        await WaitFor(() => view.Selection == (3, 3));
+        window.KeyPress(Key.Enter, RawInputModifiers.Shift, PhysicalKey.Enter, null);
+        await WaitFor(() => view.Selection == (1, 1));
+
+        box.Text = "nowhere";
+        await window.FindAsync(forward: true);
+        Assert.Contains("No lines contain \"nowhere\"", window.FindControl<TextBlock>("StatusText")!.Text);
+        Assert.Equal((1, 1), view.Selection);
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public async Task Opens_files_selects_lines_and_copies_them()
     {
         var path = WriteLog("alpha\nbravo ERROR here\ncharlie\tTabbed\ndelta\n");

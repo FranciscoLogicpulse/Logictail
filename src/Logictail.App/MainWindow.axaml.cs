@@ -1,3 +1,4 @@
+using Logictail.Core.Localization;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
@@ -73,11 +74,16 @@ public partial class MainWindow : Window
         AddKey(Key.T, KeyModifiers.Control, () => OnToggleFollow(null, null!));
         AddKey(Key.C, KeyModifiers.Control, () => OnCopy(null, null!));
         AddKey(Key.M, KeyModifiers.Control, () => { _settings.HideMainMenu = !_settings.HideMainMenu; ApplySettings(); });
+        AddKey(Key.F, KeyModifiers.Control, () => OnFind(null, null!));
+        AddKey(Key.F3, KeyModifiers.None, () => _ = FindAsync(forward: true));
+        AddKey(Key.F3, KeyModifiers.Shift, () => _ = FindAsync(forward: false));
+        SearchBox.KeyDown += OnSearchKey;
+        SearchBox.TextChanged += (_, _) => { _searchNote = ""; UpdateChrome(); };
         _timer.Tick += (_, _) => RefreshAll();
 
         PositionChanged += (_, _) => { if (WindowState == WindowState.Normal) _normalPosition = Position; };
         Resized += (_, _) => { if (WindowState == WindowState.Normal) _normalSize = ClientSize; };
-        SizeChanged += (_, e) => AutoSidebar(e.NewSize.Width);
+        SizeChanged += (_, e) => { AutoSidebar(e.NewSize.Width); CompactToolbar(e.NewSize.Width); };
         Closing += (_, _) => SaveOnExit();
 
         ApplySettings();
@@ -90,9 +96,9 @@ public partial class MainWindow : Window
             Tabs.SelectedItem = _tabs[_settings.CurrentTabIndex].Tab;
 
         var problems = commandLine.Errors.ToList();
-        if (_store.LoadError is { } loadError) problems.Add("Settings file could not be read, defaults used:\n" + loadError);
+        if (_store.LoadError is { } loadError) problems.Add(L._("Settings file could not be read, defaults used:\n") + loadError);
         if (problems.Count > 0)
-            Opened += async (_, _) => await MessageWindow.Show(this, "Logictail", string.Join("\n", problems) + "\n\n" + CommandLine.Usage);
+            Opened += async (_, _) => await MessageWindow.Show(this, L._("Logictail"), string.Join("\n", problems) + "\n\n" + CommandLine.Usage);
         _timer.Start();
     }
 
@@ -160,6 +166,14 @@ public partial class MainWindow : Window
         if (_sidebarSetByUser) return;
         var collapse = width < 820;
         if (collapse != _sidebarCollapsed) SetSidebar(collapse);
+    }
+
+    /// <summary>Narrow windows: icon-only Open/Highlighting and a shorter search box, so the toolbar fits.</summary>
+    private void CompactToolbar(double width)
+    {
+        var compact = width < 760;
+        ToolOpenText.IsVisible = ToolHighlightingText.IsVisible = !compact;
+        SearchBox.Width = compact ? 140 : 190;
     }
 
     private void SetSidebar(bool collapsed)
@@ -303,14 +317,15 @@ public partial class MainWindow : Window
         _syncingToolbar = true;
         try
         {
+            SearchBox.IsEnabled = SearchPrev.IsEnabled = SearchNext.IsEnabled = Current is not null;
             if (Current is not { } tab)
             {
                 FollowCheck.IsEnabled = EncodingCombo.IsEnabled = false;
                 FollowCheck.IsChecked = false;
                 EncodingCombo.SelectedIndex = -1;
-                PathText.Text = "Open a file to view...";
-                Title = "Logictail";
-                StatusText.Text = "Open a file to start: Ctrl+O, or drop it here.";
+                PathText.Text = L._("Open a file to view...");
+                Title = L._("Logictail");
+                StatusText.Text = L._("Open a file to start: Ctrl+O, or drop it here.");
                 FollowTailItem.IsChecked = false;
                 return;
             }
@@ -322,9 +337,10 @@ public partial class MainWindow : Window
             PathText.Foreground = f.Error is null ? Palette.Charcoal : Palette.Red;
             ToolTip.SetTip(PathText, PathText.Text);
             Title = $"{f.Name} - Logictail";
-            var indexing = f.IsFullyIndexed ? "" : "  |  indexing...";
-            var selection = tab.View.Selection is var (a, b) ? $"  |  selected {b - a + 1:N0} line(s)" : "";
-            StatusText.Text = $"{f.LineCount:N0} lines  |  {LogTab.FormatSize(f.Length)}{selection}{indexing}";
+            var indexing = f.IsFullyIndexed ? "" : "  |  " + L._("indexing...");
+            var selection = tab.View.Selection is var (a, b) ? L.F("  |  selected {0:N0} line(s)", b - a + 1) : "";
+            StatusText.Text = L.F("{0:N0} lines", f.LineCount) + $"  |  {LogTab.FormatSize(f.Length)}{selection}{indexing}{_searchNote}";
+            tab.View.SearchText = SearchBox.Text ?? "";
             FollowTailItem.IsChecked = tab.View.FollowTail;
             foreach (var item in EncodingMenu.Items.OfType<MenuItem>())
                 item.IsChecked = item.Tag is TextEncodingKind k && k == f.Encoding;
@@ -333,6 +349,53 @@ public partial class MainWindow : Window
         {
             _syncingToolbar = false;
         }
+    }
+
+    // --- find ---
+
+    private string _searchNote = "";
+    private CancellationTokenSource? _searchCts;
+
+    private void OnFind(object? sender, RoutedEventArgs e)
+    {
+        ShowPage(logs: true);
+        SearchBox.Focus();
+        SearchBox.SelectAll();
+    }
+
+    private void OnSearchPrev(object? sender, RoutedEventArgs e) => _ = FindAsync(forward: false);
+    private void OnSearchNext(object? sender, RoutedEventArgs e) => _ = FindAsync(forward: true);
+
+    private void OnSearchKey(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            _ = FindAsync(forward: !e.KeyModifiers.HasFlag(KeyModifiers.Shift));
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape)
+        {
+            SearchBox.Text = "";
+            Current?.View.Focus();
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>Selects the next (or previous) line containing the search text, from the selection or the top line.</summary>
+    public async Task FindAsync(bool forward)
+    {
+        if (Current is not { } tab || string.IsNullOrEmpty(SearchBox.Text)) return;
+        var text = SearchBox.Text;
+        var from = tab.View.Selection is var (first, _) ? first : forward ? tab.View.TopLine - 1 : tab.View.TopLine;
+        _searchCts?.Cancel();
+        var cts = _searchCts = new CancellationTokenSource();
+        int? found;
+        try { found = await Task.Run(() => LogSearch.Find(tab.File, text, Math.Max(0, from), forward, cts.Token)); }
+        catch (OperationCanceledException) { return; }
+        if (cts.IsCancellationRequested || tab != Current) return;
+        _searchNote = found is null ? "  |  " + L.F("No lines contain \"{0}\"", text) : "";
+        if (found is { } line) tab.View.Reveal(line);
+        UpdateChrome();
     }
 
     private void RebuildRecentMenu()
@@ -349,11 +412,11 @@ public partial class MainWindow : Window
 
     private ContextMenu ViewContextMenu(LogTab tab)
     {
-        var copy = new MenuItem { Header = "_Copy", InputGesture = new KeyGesture(Key.C, KeyModifiers.Control) };
+        var copy = new MenuItem { Header = L._("_Copy"), InputGesture = new KeyGesture(Key.C, KeyModifiers.Control) };
         copy.Click += (_, _) => OnCopy(null, null!);
-        var follow = new MenuItem { Header = "Follow _Tail", ToggleType = MenuItemToggleType.CheckBox };
+        var follow = new MenuItem { Header = L._("Follow _Tail"), ToggleType = MenuItemToggleType.CheckBox };
         follow.Click += (_, _) => { tab.View.FollowTail = !tab.View.FollowTail; UpdateChrome(); };
-        var showMenu = new MenuItem { Header = "Show _Main Menu" };
+        var showMenu = new MenuItem { Header = L._("Show _Main Menu") };
         showMenu.Click += (_, _) => { _settings.HideMainMenu = false; ApplySettings(); };
         var menu = new ContextMenu { Items = { copy, follow, new Separator(), showMenu } };
         menu.Opening += (_, _) =>
@@ -367,11 +430,11 @@ public partial class MainWindow : Window
 
     private ContextMenu TabContextMenu(LogTab tab)
     {
-        var close = new MenuItem { Header = "_Close" };
+        var close = new MenuItem { Header = L._("_Close") };
         close.Click += (_, _) => CloseTab(tab);
-        var others = new MenuItem { Header = "Close O_thers" };
+        var others = new MenuItem { Header = L._("Close O_thers") };
         others.Click += (_, _) => { foreach (var t in _tabs.Where(t => t != tab).ToList()) CloseTab(t); };
-        var all = new MenuItem { Header = "Close _All" };
+        var all = new MenuItem { Header = L._("Close _All") };
         all.Click += (_, _) => OnCloseAll(null, null!);
         return new ContextMenu { Items = { close, others, all } };
     }
@@ -382,7 +445,7 @@ public partial class MainWindow : Window
     {
         var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            Title = "Select file(s) to view",
+            Title = L._("Select file(s) to view"),
             AllowMultiple = true,
         });
         OpenFiles(files.Select(f => f.TryGetLocalPath()).OfType<string>());
@@ -483,8 +546,8 @@ public partial class MainWindow : Window
     {
         var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            Title = "Select a settings file to load",
-            FileTypeFilter = [new FilePickerFileType("Logictail settings") { Patterns = ["*.json"] }],
+            Title = L._("Select a settings file to load"),
+            FileTypeFilter = [new FilePickerFileType(L._("Logictail settings")) { Patterns = ["*.json"] }],
         });
         if (files.FirstOrDefault()?.TryGetLocalPath() is not { } path) return;
         try
@@ -499,7 +562,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
         {
-            await MessageWindow.Show(this, "Load settings", $"Could not load {path}:\n{ex.Message}");
+            await MessageWindow.Show(this, L._("Load settings"), $"Could not load {path}:\n{ex.Message}");
         }
     }
 
@@ -507,25 +570,25 @@ public partial class MainWindow : Window
     {
         var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
-            Title = "Save settings to file",
+            Title = L._("Save settings to file"),
             SuggestedFileName = SettingsStore.FileName,
             DefaultExtension = "json",
-            FileTypeChoices = [new FilePickerFileType("Logictail settings") { Patterns = ["*.json"] }],
+            FileTypeChoices = [new FilePickerFileType(L._("Logictail settings")) { Patterns = ["*.json"] }],
         });
         if (file?.TryGetLocalPath() is not { } path) return;
         try { SettingsStore.SaveFile(_settings, path); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            await MessageWindow.Show(this, "Save settings", $"Could not save {path}:\n{ex.Message}");
+            await MessageWindow.Show(this, L._("Save settings"), L.F("Could not save {0}:\n{1}", path, ex.Message));
         }
     }
 
     private async void OnUsage(object? sender, RoutedEventArgs e) =>
-        await MessageWindow.Show(this, "Command line usage", CommandLine.Usage, monospace: true);
+        await MessageWindow.Show(this, L._("Command line usage"), CommandLine.Usage, monospace: true);
 
     private async void OnAbout(object? sender, RoutedEventArgs e) =>
-        await MessageWindow.Show(this, "About Logictail",
-            $"Logictail {typeof(MainWindow).Assembly.GetName().Version?.ToString(3)}\nReal-time log viewer for personal use.\n\nSettings: {_store.LoadedFrom ?? _store.PathFor(_settings.SaveOnExit) ?? "not saved"}");
+        await MessageWindow.Show(this, L._("About Logictail"),
+            L.F("Logictail {0}\nReal-time log viewer for personal use.\n\nSettings: {1}", typeof(MainWindow).Assembly.GetName().Version?.ToString(3), _store.LoadedFrom ?? _store.PathFor(_settings.SaveOnExit) ?? L._("not saved")));
 
     private void OnExit(object? sender, RoutedEventArgs e) => Close();
 

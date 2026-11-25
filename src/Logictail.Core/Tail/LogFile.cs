@@ -1,3 +1,4 @@
+using Logictail.Core.Localization;
 using System.Text;
 
 namespace Logictail.Core.Tail;
@@ -136,7 +137,7 @@ public sealed class LogFile
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            Error = ex is FileNotFoundException or DirectoryNotFoundException ? "File not found" : ex.Message;
+            Error = ex is FileNotFoundException or DirectoryNotFoundException ? L._("File not found") : ex.Message;
             return RefreshResult.Error;
         }
     }

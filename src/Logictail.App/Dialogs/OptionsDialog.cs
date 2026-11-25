@@ -1,3 +1,4 @@
+using Logictail.Core.Localization;
 using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
@@ -17,22 +18,24 @@ public sealed class OptionsDialog : Window
     private readonly ComboBox _wrap = new() { MinWidth = 160 };
     private readonly ComboBox _interval = new() { MinWidth = 160 };
     private readonly NumericUpDown _tabWidth = new() { Minimum = 1, Maximum = 16, Increment = 1, FormatString = "0", Width = 120 };
-    private readonly CheckBox _markers = new() { Content = "Show line _markers on wrapped lines" };
-    private readonly ComboBox _tabPos = new() { MinWidth = 160, ItemsSource = Enum.GetNames<TabStripPosition>() };
-    private readonly ComboBox _showTabs = new() { MinWidth = 160, ItemsSource = new[] { "Never", "At least two tabs", "At least one tab", "Always" } };
-    private readonly CheckBox _onTop = new() { Content = "_Always on top" };
-    private readonly CheckBox _hideMenu = new() { Content = "_Hide main menu (Ctrl+M shows it again)" };
-    private readonly ComboBox _saveOnExit = new() { MinWidth = 220, ItemsSource = new[] { "Never", "To file in working directory", "To file in application directory", "To my user profile" } };
-    private readonly CheckBox _savePos = new() { Content = "Save window _position" };
-    private readonly ComboBox _activate = new() { MinWidth = 220, ItemsSource = new[] { "Never", "On scroll to end" } };
-    private readonly ComboBox _deactivate = new() { MinWidth = 220, ItemsSource = new[] { "Never", "On scroll or selection", "On selection", "On scroll" } };
+    private readonly CheckBox _markers = new() { Content = L._("Show line _markers on wrapped lines") };
+    private readonly ComboBox _tabPos = new() { MinWidth = 160, ItemsSource = new[] { "Top", "Bottom", "Left", "Right" }.Select(L._).ToList() };
+    private readonly ComboBox _showTabs = new() { MinWidth = 160, ItemsSource = new[] { "Never", "At least two tabs", "At least one tab", "Always" }.Select(L._).ToList() };
+    private readonly CheckBox _onTop = new() { Content = L._("_Always on top") };
+    private readonly CheckBox _hideMenu = new() { Content = L._("_Hide main menu (Ctrl+M shows it again)") };
+    private readonly ComboBox _saveOnExit = new() { MinWidth = 220, ItemsSource = new[] { "Never", "To file in working directory", "To file in application directory", "To my user profile" }.Select(L._).ToList() };
+    private readonly CheckBox _savePos = new() { Content = L._("Save window _position") };
+    private readonly ComboBox _activate = new() { MinWidth = 220, ItemsSource = new[] { "Never", "On scroll to end" }.Select(L._).ToList() };
+    private readonly ComboBox _deactivate = new() { MinWidth = 220, ItemsSource = new[] { "Never", "On scroll or selection", "On selection", "On scroll" }.Select(L._).ToList() };
+
+    private readonly ComboBox _language = new() { MinWidth = 220, ItemsSource = new[] { "Português (Portugal)", "English" } };
 
     private static readonly int[] WrapValues = [AppSettings.WrapOff, AppSettings.WrapAuto, .. AppSettings.WrapColumns];
 
     public OptionsDialog(AppSettings settings, string? loadedFrom)
     {
         _original = settings;
-        Title = "Options";
+        Title = L._("Options");
         Width = 620;
         SizeToContent = SizeToContent.Height;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -41,9 +44,9 @@ public sealed class OptionsDialog : Window
         _font.ItemsSource = MonospaceFonts(settings.FontFamily);
         _wrap.ItemsSource = WrapValues.Select(v => v switch
         {
-            AppSettings.WrapOff => "Off (scroll sideways)",
-            AppSettings.WrapAuto => "Window width",
-            _ => $"{v} columns",
+            AppSettings.WrapOff => L._("Off (scroll sideways)"),
+            AppSettings.WrapAuto => L._("Window width"),
+            _ => L.F("{0} columns", v),
         }).ToList();
         _interval.ItemsSource = AppSettings.UpdateIntervals.Select(FormatInterval).ToList();
 
@@ -71,33 +74,36 @@ public sealed class OptionsDialog : Window
         }
         TextBlock Label(string t) => new() { Text = t, VerticalAlignment = VerticalAlignment.Center };
 
-        Section("Font");
-        Add(Label("Name:"), _font);
-        Add(Label("Size:"), _size);
-        Add(Label("Line spacing (pixels):"), _spacing);
-        Section("File viewing");
-        Add(Label("Wrap lines at:"), _wrap);
-        Add(Label("Update interval:"), _interval);
-        Add(Label("Tab width (characters):"), _tabWidth);
+        Section(L._("Language"));
+        Add(Label(L._("Language:")), _language);
+        Add(new Control(), new TextBlock { Text = L._("The new language applies after Logictail restarts."), Foreground = Brushes.Gray, FontSize = 12 });
+        Section(L._("Font"));
+        Add(Label(L._("Name:")), _font);
+        Add(Label(L._("Size:")), _size);
+        Add(Label(L._("Line spacing (pixels):")), _spacing);
+        Section(L._("File viewing"));
+        Add(Label(L._("Wrap lines at:")), _wrap);
+        Add(Label(L._("Update interval:")), _interval);
+        Add(Label(L._("Tab width (characters):")), _tabWidth);
         Add(new Control(), _markers);
-        Section("Follow tail");
-        Add(Label("Turn on:"), _activate);
-        Add(Label("Turn off:"), _deactivate);
-        Section("File tabs");
-        Add(Label("Position:"), _tabPos);
-        Add(Label("Show tabs:"), _showTabs);
-        Section("Main window");
+        Section(L._("Follow tail"));
+        Add(Label(L._("Turn on:")), _activate);
+        Add(Label(L._("Turn off:")), _deactivate);
+        Section(L._("File tabs"));
+        Add(Label(L._("Position:")), _tabPos);
+        Add(Label(L._("Show tabs:")), _showTabs);
+        Section(L._("Main window"));
         Add(new Control(), _onTop);
         Add(new Control(), _hideMenu);
-        Section("Saving settings");
-        Add(Label("Save on exit:"), _saveOnExit);
+        Section(L._("Saving settings"));
+        Add(Label(L._("Save on exit:")), _saveOnExit);
         Add(new Control(), _savePos);
-        Add(Label("Loaded from:"), new SelectableTextBlock { Text = loadedFrom ?? "(defaults)", Foreground = Brushes.Gray, TextWrapping = TextWrapping.Wrap, MaxWidth = 420 });
+        Add(Label(L._("Loaded from:")), new SelectableTextBlock { Text = loadedFrom ?? L._("(defaults)"), Foreground = Brushes.Gray, TextWrapping = TextWrapping.Wrap, MaxWidth = 420 });
 
-        var defaults = new Button { Content = "_Restore Defaults" };
+        var defaults = new Button { Content = L._("_Restore Defaults") };
         defaults.Click += (_, _) => Load(new AppSettings());
-        var ok = new Button { Content = "OK", IsDefault = true, MinWidth = 80, Classes = { "primary" } };
-        var cancel = new Button { Content = "Cancel", IsCancel = true, MinWidth = 80 };
+        var ok = new Button { Content = L._("OK"), IsDefault = true, MinWidth = 80, Classes = { "primary" } };
+        var cancel = new Button { Content = L._("Cancel"), IsCancel = true, MinWidth = 80 };
         ok.Click += (_, _) => Close(Build());
         cancel.Click += (_, _) => Close(null);
         var buttons = new DockPanel { Margin = new Thickness(0, 16, 0, 0) };
@@ -135,6 +141,7 @@ public sealed class OptionsDialog : Window
         _hideMenu.IsChecked = s.HideMainMenu;
         _saveOnExit.SelectedIndex = (int)s.SaveOnExit;
         _savePos.IsChecked = s.SaveWindowPosition;
+        _language.SelectedIndex = (int)s.Language;
     }
 
     private AppSettings Build()
@@ -155,6 +162,7 @@ public sealed class OptionsDialog : Window
         s.HideMainMenu = _hideMenu.IsChecked == true;
         s.SaveOnExit = (SaveLocation)_saveOnExit.SelectedIndex;
         s.SaveWindowPosition = _savePos.IsChecked == true;
+        s.Language = (Language)Math.Max(0, _language.SelectedIndex);
         return s.Normalize();
     }
 

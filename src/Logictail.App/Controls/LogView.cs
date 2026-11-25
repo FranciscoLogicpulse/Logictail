@@ -19,6 +19,8 @@ public sealed class LogView : Control
     private const int MaxCopyLines = 200_000;
     private static readonly IBrush SelectionBrush = Palette.Teal;
     private static readonly IBrush MarkerBrush = Palette.TealLight;
+    private static readonly IBrush MatchBrush = new SolidColorBrush(Color.Parse("#FFF4CC"));
+    private static readonly IBrush MatchBarBrush = new SolidColorBrush(Color.Parse("#E0A100"));
 
     private AppSettings _settings = new();
     private Typeface _typeface;
@@ -45,6 +47,24 @@ public sealed class LogView : Control
     public LogFile? File { get; set; }
 
     public HighlightRuleSet Rules { get; set; } = HighlightRuleSet.Empty;
+
+    /// <summary>Text being searched for; visible lines containing it get a soft yellow mark.</summary>
+    public string SearchText
+    {
+        get => _searchText;
+        set { if (_searchText == (value ?? "")) return; _searchText = value ?? ""; InvalidateVisual(); }
+    }
+    private string _searchText = "";
+
+    /// <summary>Selects <paramref name="line"/> and scrolls it into view (a third from the top), leaving follow tail.</summary>
+    public void Reveal(int line)
+    {
+        _followTail = false;
+        _selAnchor = _selActive = line;
+        if (line < _topLine || line >= _topLine + VisibleRows - 1) _topLine = Math.Clamp(line - VisibleRows / 3, 0, MaxTopLine);
+        InvalidateVisual();
+        Changed();
+    }
 
     /// <summary>Raised when scroll position, follow state or selection changed.</summary>
     public event EventHandler? ViewChanged;
@@ -177,6 +197,11 @@ public sealed class LogView : Control
             {
                 context.FillRectangle(new SolidColorBrush(Color.FromUInt32(rule.Background)), new Rect(0, y, size.Width, height));
                 fg = new SolidColorBrush(Color.FromUInt32(rule.Foreground));
+            }
+            if (!selected && _searchText.Length > 0 && raw.Contains(_searchText, StringComparison.OrdinalIgnoreCase))
+            {
+                if (rule is null) context.FillRectangle(MatchBrush, new Rect(0, y, size.Width, height));
+                context.FillRectangle(MatchBarBrush, new Rect(0, y, 3, height));
             }
             if (rule is not null)
             {

@@ -1,3 +1,4 @@
+using Logictail.Core.Localization;
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
@@ -42,16 +43,16 @@ public sealed class ScannerView : UserControl
     private readonly TextBox _from = new() { PlaceholderText = "192.168.1.1", MinWidth = 140 };
     private readonly TextBox _to = new() { PlaceholderText = "192.168.1.254", MinWidth = 140 };
     private string? _predicted; // prefix we filled into "To", so we can update it while the user hasn't typed there
-    private readonly ComboBox _speed = new() { ItemsSource = new[] { "Fast", "Accurate (slower)" }, SelectedIndex = 0, Width = 140 };
-    private readonly Button _scanButton = new() { Content = "Scan", MinWidth = 90, Classes = { "primary" } }; // not IsDefault: Enter in the search box must not start a scan
-    private readonly Button _pauseButton = new() { Content = "Pause", MinWidth = 80, IsEnabled = false };
-    private readonly CheckBox _showAlive = new() { Content = "Show _alive", IsChecked = true };
-    private readonly CheckBox _showDead = new() { Content = "Show _dead", IsChecked = false };
-    private readonly CheckBox _showUnknown = new() { Content = "Show _unknown", IsChecked = true };
-    private readonly CheckBox _favoritesOnly = new() { Content = "_Favorites only", IsChecked = false };
-    private readonly CheckBox _listShares = new() { Content = "Shares", IsChecked = false };
-    private readonly TextBox _search = new() { PlaceholderText = "Search results", Width = 200 };
-    private readonly TextBox _ports = new() { PlaceholderText = "No port scan (e.g. 22, 80, 443, UDP: 53)", Width = 280 };
+    private readonly ComboBox _speed = new() { ItemsSource = new[] { "Fast", "Accurate (slower)" }.Select(L._).ToList(), SelectedIndex = 0, Width = 140 };
+    private readonly Button _scanButton = new() { Content = L._("Scan"), MinWidth = 90, Classes = { "primary" } }; // not IsDefault: Enter in the search box must not start a scan
+    private readonly Button _pauseButton = new() { Content = L._("Pause"), MinWidth = 80, IsEnabled = false };
+    private readonly CheckBox _showAlive = new() { Content = L._("Show _alive"), IsChecked = true };
+    private readonly CheckBox _showDead = new() { Content = L._("Show _dead"), IsChecked = false };
+    private readonly CheckBox _showUnknown = new() { Content = L._("Show _unknown"), IsChecked = true };
+    private readonly CheckBox _favoritesOnly = new() { Content = L._("_Favorites only"), IsChecked = false };
+    private readonly CheckBox _listShares = new() { Content = L._("Shares"), IsChecked = false };
+    private readonly TextBox _search = new() { PlaceholderText = L._("Search results"), Width = 200 };
+    private readonly TextBox _ports = new() { PlaceholderText = L._("No port scan (e.g. 22, 80, 443, UDP: 53)"), Width = 280 };
     private readonly ListBox _list = new() { SelectionMode = SelectionMode.Multiple };
     private readonly StackPanel _details = new() { Spacing = 4, Margin = new Thickness(12) };
     private readonly ProgressBar _progress = new() { Minimum = 0, Maximum = 100, Width = 200, Height = 6 };
@@ -72,7 +73,7 @@ public sealed class ScannerView : UserControl
     private PauseGate? _gate;
     private SortColumn _sort = SortColumn.Address;
     private bool _descending;
-    private string _idleState = "Ready"; // shown when not scanning: Ready, Finished or Stopped
+    private string _idleState = L._("Ready"); // shown when not scanning: Ready, Finished or Stopped
 
     public ScannerView() : this(new SystemProbes(), Path.Combine(AppContext.BaseDirectory, "data", "oui.csv"), HostStore.Load(HostStore.DefaultPath)) { }
 
@@ -96,31 +97,31 @@ public sealed class ScannerView : UserControl
             _to.CaretIndex = prefix.Length;
         };
 
-        ToolTip.SetTip(_listShares, "Also list shared folders. Windows signs in to each device as you to do this.");
+        ToolTip.SetTip(_listShares, L._("Also list shared folders. Windows signs in to each device as you to do this."));
         // One "Fill range" menu instead of three buttons keeps the toolbar on one line.
-        var fill = new Button { Content = "Fill range" };
+        var fill = new Button { Content = L._("Fill range") };
         fill.Flyout = new MenuFlyout
         {
             Items =
             {
-                MenuItem("This PC's subnet", () => RangeText = LocalNetwork.Subnets().FirstOrDefault()?.ToRangeText() ?? RangeText),
-                MenuItem("My favorites", FillFavorites),
-                MenuItem("From a file (one address or range per line)...", async () => await LoadTargetsFileAsync()),
+                MenuItem(L._("This PC's subnet"), () => RangeText = LocalNetwork.Subnets().FirstOrDefault()?.ToRangeText() ?? RangeText),
+                MenuItem(L._("My favorites"), FillFavorites),
+                MenuItem(L._("From a file (one address or range per line)..."), async () => await LoadTargetsFileAsync()),
             },
         };
         _scanButton.Click += async (_, _) => await ToggleScanAsync();
         _pauseButton.Click += (_, _) => TogglePause();
 
-        var export = new Button { Content = "Export" };
+        var export = new Button { Content = L._("Export") };
         export.Flyout = new MenuFlyout
         {
             Items =
             {
-                MenuItem("CSV...", async () => await ExportAsync("csv", ',')),
-                MenuItem("CSV for Excel (semicolons)...", async () => await ExportAsync("csv", ';')),
-                MenuItem("HTML...", async () => await ExportAsync("html", ',')),
+                MenuItem(L._("CSV..."), async () => await ExportAsync("csv", ',')),
+                MenuItem(L._("CSV for Excel (semicolons)..."), async () => await ExportAsync("csv", ';')),
+                MenuItem(L._("HTML..."), async () => await ExportAsync("html", ',')),
                 new Separator(),
-                MenuItem("Delete saved names, comments and favorites...", async () => await ForgetAllAsync()),
+                MenuItem(L._("Delete saved names, comments and favorites..."), async () => await ForgetAllAsync()),
             },
         };
 
@@ -147,29 +148,29 @@ public sealed class ScannerView : UserControl
         _from.Width = _to.Width = 140;
         _from.MinWidth = _to.MinWidth = 0;
         var rangeGroup = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(0, 0, 20, 8),
-            Children = { Label("From"), _from, Label("To", 20), _to, fill } };
+            Children = { Label(L._("From")), _from, Label(L._("To"), 30), _to, fill } };
         var actionGroup = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(0, 0, 0, 8),
             Children = { _speed, _scanButton, _pauseButton } };
         _speed.Width = 130;
         _listShares.VerticalAlignment = VerticalAlignment.Center;
         var toolbar = new WrapPanel { Margin = new Thickness(14, 12, 14, 0), Children = { rangeGroup, actionGroup } };
         var filters = new WrapPanel { Margin = new Thickness(14, 0, 14, 8) };
-        var presets = new Button { Content = "Presets" };
+        var presets = new Button { Content = L._("Presets") };
         presets.Flyout = new MenuFlyout
         {
             Items =
             {
-                MenuItem("Common ports", () => _ports.Text = PortList.Common),
-                MenuItem("Well-known TCP ports (1-1023)", () => _ports.Text = PortList.WellKnown),
-                MenuItem("All TCP ports (1-65535, slow)", () => _ports.Text = PortList.AllTcp),
+                MenuItem(L._("Common ports"), () => _ports.Text = PortList.Common),
+                MenuItem(L._("Well-known TCP ports (1-1023)"), () => _ports.Text = PortList.WellKnown),
+                MenuItem(L._("All TCP ports (1-65535, slow)"), () => _ports.Text = PortList.AllTcp),
                 new Separator(),
-                MenuItem("No port scan", () => _ports.Text = null),
+                MenuItem(L._("No port scan"), () => _ports.Text = null),
             },
         };
-        ToolTip.SetTip(_ports, "Ports to check on every live device. Ranges and UDP allowed: 22, 80, 8000-8100, UDP: 53, 161");
-        _ports.Width = 140 + 8 + 20 + 8 + 140; // same span as From box + "To" + To box, so Presets sits under Fill range
+        ToolTip.SetTip(_ports, L._("Ports to check on every live device. Ranges and UDP allowed: 22, 80, 8000-8100, UDP: 53, 161"));
+        _ports.Width = 140 + 8 + 30 + 8 + 140; // same span as From box + "To" + To box, so Presets sits under Fill range
         var portsGroup = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(0, 0, 20, 8),
-            Children = { Label("Ports"), _ports, presets, _listShares } };
+            Children = { Label(L._("Ports")), _ports, presets, _listShares } };
         var findGroup = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(0, 0, 0, 8),
             Children = { _search, export } };
         var portsRow = new WrapPanel { Margin = new Thickness(14, 0, 14, 0), Children = { portsGroup, findGroup } };
@@ -302,12 +303,12 @@ public sealed class ScannerView : UserControl
         var parsed = IpRangeParser.Parse(RangeText);
         if (parsed.Errors.Count > 0 || parsed.Targets.Count == 0)
         {
-            ShowError(parsed.Errors.Count > 0 ? string.Join("; ", parsed.Errors) : "Enter an IP address, range or host name to scan.");
+            ShowError(parsed.Errors.Count > 0 ? string.Join("; ", parsed.Errors) : L._("Enter an IP address, range or host name to scan."));
             return;
         }
 
         var portParse = PortListParser.Parse(PortsText);
-        if (portParse.Errors.Count > 0) { ShowError("Ports: " + string.Join("; ", portParse.Errors)); return; }
+        if (portParse.Errors.Count > 0) { ShowError(L._("Ports: ") + string.Join("; ", portParse.Errors)); return; }
         var ports = portParse.Ports;
 
         _results.Clear();
@@ -317,9 +318,9 @@ public sealed class ScannerView : UserControl
         _lastProgress = null;
         _cts = new CancellationTokenSource();
         _gate = new PauseGate();
-        _scanButton.Content = "Stop";
+        _scanButton.Content = L._("Stop");
         _pauseButton.IsEnabled = true;
-        _pauseButton.Content = "Pause";
+        _pauseButton.Content = L._("Pause");
         _flush.Start();
         UpdateStatus();
         ShowDetails();
@@ -349,27 +350,27 @@ public sealed class ScannerView : UserControl
             _cts.Dispose();
             _cts = null;
             _gate = null;
-            _scanButton.Content = "Scan";
+            _scanButton.Content = L._("Scan");
             _pauseButton.IsEnabled = false;
-            _pauseButton.Content = "Pause";
-            _idleState = stopped ? "Stopped" : "Finished";
+            _pauseButton.Content = L._("Pause");
+            _idleState = stopped ? L._("Stopped") : L._("Finished");
             UpdateStatus();
-            if (failure is not null) ShowError("Scan failed: " + failure);
+            if (failure is not null) ShowError(L._("Scan failed: ") + failure);
         }
     }
 
     private void TogglePause()
     {
         if (_gate is null) return;
-        if (_gate.IsPaused) { _gate.Resume(); _pauseButton.Content = "Pause"; }
-        else { _gate.Pause(); _pauseButton.Content = "Resume"; }
+        if (_gate.IsPaused) { _gate.Resume(); _pauseButton.Content = L._("Pause"); }
+        else { _gate.Pause(); _pauseButton.Content = L._("Resume"); }
         UpdateStatus();
     }
 
     private void FillFavorites()
     {
         var addresses = _store.FavoriteAddresses();
-        if (addresses.Count == 0) { ShowError("No favorites yet. Right-click a device and choose Add to favorites."); return; }
+        if (addresses.Count == 0) { ShowError(L._("No favorites yet. Right-click a device and choose Add to favorites.")); return; }
         RangeText = string.Join(", ", addresses);
     }
 
@@ -378,8 +379,8 @@ public sealed class ScannerView : UserControl
         if (TopLevel.GetTopLevel(this)?.StorageProvider is not { } storage) return;
         var files = await storage.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            Title = "Load addresses to scan",
-            FileTypeFilter = [new FilePickerFileType("Text files") { Patterns = ["*.txt", "*.*"] }],
+            Title = L._("Load addresses to scan"),
+            FileTypeFilter = [new FilePickerFileType(L._("Text files")) { Patterns = ["*.txt", "*.*"] }],
         });
         if (files.FirstOrDefault()?.TryGetLocalPath() is not { } path) return;
         try
@@ -392,7 +393,7 @@ public sealed class ScannerView : UserControl
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            ShowError($"Could not read {path}: {ex.Message}");
+            ShowError(L.F("Could not read {0}: {1}", path, ex.Message));
         }
     }
 
@@ -507,35 +508,35 @@ public sealed class ScannerView : UserControl
             menu.Items.Add(MenuItem(HostActions.Label(action), () => RunAction(action, h)));
         if (h.Shares.Count > 0)
         {
-            var shares = new MenuItem { Header = "Open share" };
-            foreach (var share in h.Shares) shares.Items.Add(MenuItem($"{share.Name}{(share.Kind == ShareKind.Printer ? " (printer)" : "")}", () => RunAction(HostAction.Explore, h, share.Name)));
+            var shares = new MenuItem { Header = L._("Open share") };
+            foreach (var share in h.Shares) shares.Items.Add(MenuItem(share.Name + (share.Kind == ShareKind.Printer ? " " + L._("(printer)") : ""), () => RunAction(HostAction.Explore, h, share.Name)));
             menu.Items.Add(shares);
         }
         else if (h.Services.Any(s => s.Kind == ServiceKind.Smb))
         {
-            var list = MenuItem("List shared folders (signs in as you)", async () => await ListSharesAsync(h));
+            var list = MenuItem(L._("List shared folders (signs in as you)"), async () => await ListSharesAsync(h));
             menu.Items.Add(list);
         }
-        menu.Items.Add(MenuItem(h.OpenPorts.Count > 0 ? "Scan ports again" : "Scan ports", async () => await ScanPortsAsync(h)));
-        var more = new MenuItem { Header = "All tools" };
+        menu.Items.Add(MenuItem(L._(h.OpenPorts.Count > 0 ? "Scan ports again" : "Scan ports"), async () => await ScanPortsAsync(h)));
+        var more = new MenuItem { Header = L._("All tools") };
         foreach (var action in Enum.GetValues<HostAction>()) more.Items.Add(MenuItem(HostActions.Label(action), () => RunAction(action, h)));
         menu.Items.Add(more);
-        var wol = MenuItem("Wake-on-LAN", async () => await WakeAsync(h));
+        var wol = MenuItem(L._("Wake-on-LAN"), async () => await WakeAsync(h));
         wol.IsEnabled = h.Mac is not null;
         menu.Items.Add(wol);
 
         menu.Items.Add(new Separator());
-        menu.Items.Add(MenuItem("Edit name and comment...", async () => await EditAsync(h)));
-        menu.Items.Add(MenuItem(h.IsFavorite ? "Remove from favorites" : "Add to favorites", () => ToggleFavorite(h)));
+        menu.Items.Add(MenuItem(L._("Edit name and comment..."), async () => await EditAsync(h)));
+        menu.Items.Add(MenuItem(L._(h.IsFavorite ? "Remove from favorites" : "Add to favorites"), () => ToggleFavorite(h)));
         menu.Items.Add(new Separator());
-        var copy = new MenuItem { Header = "Copy" };
-        copy.Items.Add(MenuItem("IP address", async () => await CopyAsync(h.Address.ToString())));
-        if (h.Name is { } n) copy.Items.Add(MenuItem("Name", async () => await CopyAsync(n)));
-        if (h.Mac is { } m) copy.Items.Add(MenuItem("MAC address", async () => await CopyAsync(m)));
-        copy.Items.Add(MenuItem("Network path", async () => await CopyAsync(HostActions.UncPath(h.Address))));
-        copy.Items.Add(MenuItem("Row", async () => await CopyAsync(Export.ToCsv([h], '\t').Split(Environment.NewLine)[1])));
+        var copy = new MenuItem { Header = L._("Copy") };
+        copy.Items.Add(MenuItem(L._("IP address"), async () => await CopyAsync(h.Address.ToString())));
+        if (h.Name is { } n) copy.Items.Add(MenuItem(L._("Name"), async () => await CopyAsync(n)));
+        if (h.Mac is { } m) copy.Items.Add(MenuItem(L._("MAC address"), async () => await CopyAsync(m)));
+        copy.Items.Add(MenuItem(L._("Network path"), async () => await CopyAsync(HostActions.UncPath(h.Address))));
+        copy.Items.Add(MenuItem(L._("Row"), async () => await CopyAsync(Export.ToCsv([h], '\t').Split(Environment.NewLine)[1])));
         menu.Items.Add(copy);
-        menu.Items.Add(MenuItem("Export selected...", async () => await ExportAsync("csv", ',', selectedOnly: true)));
+        menu.Items.Add(MenuItem(L._("Export selected..."), async () => await ExportAsync("csv", ',', selectedOnly: true)));
     }
 
     public async void RunAction(HostAction action, HostResult host, string? share = null)
@@ -546,7 +547,7 @@ public sealed class ScannerView : UserControl
         }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException or ArgumentException)
         {
-            ShowError($"{HostActions.Label(action)} failed: {ex.Message}");
+            ShowError(L.F("{0} failed: {1}", HostActions.Label(action), ex.Message));
         }
     }
 
@@ -554,14 +555,14 @@ public sealed class ScannerView : UserControl
     public async Task ScanPortsAsync(HostResult h)
     {
         var parse = PortListParser.Parse(string.IsNullOrWhiteSpace(PortsText) ? PortList.Common : PortsText);
-        if (parse.Errors.Count > 0) { ShowError("Ports: " + string.Join("; ", parse.Errors)); return; }
-        ShowInfo($"Scanning {parse.Ports.Count:N0} port(s) on {h.Address}...");
+        if (parse.Errors.Count > 0) { ShowError(L._("Ports: ") + string.Join("; ", parse.Errors)); return; }
+        ShowInfo(L.F("Scanning {0:N0} port(s) on {1}...", parse.Ports.Count, h.Address));
         var options = new ScanOptions { Speed = _speed.SelectedIndex == 1 ? ScanSpeed.Accurate : ScanSpeed.Fast };
         try
         {
             long checkedPorts = 0;
             var ticker = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
-            ticker.Tick += (_, _) => ShowInfo($"Scanning ports on {h.Address}: {Interlocked.Read(ref checkedPorts):N0} of {parse.Ports.Count:N0} checked...");
+            ticker.Tick += (_, _) => ShowInfo(L.F("Scanning ports on {0}: {1:N0} of {2:N0} checked...", h.Address, Interlocked.Read(ref checkedPorts), parse.Ports.Count));
             ticker.Start();
             IReadOnlyList<OpenPort> found;
             try
@@ -580,24 +581,24 @@ public sealed class ScannerView : UserControl
             var raw = Raw(h) with { OpenPorts = found };
             _raw[h.Address] = raw;
             Replace(h, _store.Apply(raw, _vendorDb));
-            ShowInfo(found.Count == 0 ? $"No open ports found on {h.Address}." : $"{found.Count} open port(s) on {h.Address}.");
+            ShowInfo(found.Count == 0 ? L.F("No open ports found on {0}.", h.Address) : L.F("{0} open port(s) on {1}.", found.Count, h.Address));
         }
         catch (Exception ex)
         {
-            ShowError("Port scan failed: " + ex.Message);
+            ShowError(L._("Port scan failed: ") + ex.Message);
         }
     }
 
     /// <summary>Lists one device's shares on request (signs in to it as the current Windows user).</summary>
     private async Task ListSharesAsync(HostResult h)
     {
-        ShowInfo($"Listing shared folders on {h.Address}...");
+        ShowInfo(L.F("Listing shared folders on {0}...", h.Address));
         var shares = await _probes.SharesAsync(h.Address, TimeSpan.FromSeconds(10), CancellationToken.None);
         var raw = Raw(h) with { Shares = shares };
         raw = raw with { DeviceType = DeviceTypes.Guess(raw) };
         _raw[h.Address] = raw;
         Replace(h, _store.Apply(raw, _vendorDb));
-        ShowInfo(shares.Count == 0 ? $"{h.Address} shares nothing you can see (or refused)." : $"{h.Address} shares {shares.Count} item(s).");
+        ShowInfo(shares.Count == 0 ? L.F("{0} shares nothing you can see (or refused).", h.Address) : L.F("{0} shares {1} item(s).", h.Address, shares.Count));
     }
 
     private async Task WakeAsync(HostResult h)
@@ -606,12 +607,12 @@ public sealed class ScannerView : UserControl
         try
         {
             var adapters = await WakeOnLan.SendAsync(h.Mac);
-            if (adapters == 0) ShowError("Wake-on-LAN: no network adapter could send the packet.");
-            else ShowInfo($"Wake-on-LAN packet for {h.Mac} sent from {adapters} network adapter(s).");
+            if (adapters == 0) ShowError(L._("Wake-on-LAN: no network adapter could send the packet."));
+            else ShowInfo(L.F("Wake-on-LAN packet for {0} sent from {1} network adapter(s).", h.Mac, adapters));
         }
         catch (Exception ex) when (ex is System.Net.Sockets.SocketException or ArgumentException)
         {
-            ShowError("Wake-on-LAN failed: " + ex.Message);
+            ShowError(L._("Wake-on-LAN failed: ") + ex.Message);
         }
     }
 
@@ -637,7 +638,7 @@ public sealed class ScannerView : UserControl
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            ShowError("Could not save: " + ex.Message);
+            ShowError(L._("Could not save: ") + ex.Message);
             return;
         }
         // Re-apply notes to the raw scan result so a cleared name falls back to the scanned one.
@@ -649,11 +650,11 @@ public sealed class ScannerView : UserControl
         if (TopLevel.GetTopLevel(this) is not Window owner) return;
         var confirm = new Window
         {
-            Title = "Delete saved data", SizeToContent = SizeToContent.WidthAndHeight, CanResize = false,
+            Title = L._("Delete saved data"), SizeToContent = SizeToContent.WidthAndHeight, CanResize = false,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
         };
-        var yes = new Button { Content = "Delete" };
-        var no = new Button { Content = "Cancel", IsCancel = true, IsDefault = true };
+        var yes = new Button { Content = L._("Delete") };
+        var no = new Button { Content = L._("Cancel"), IsCancel = true, IsDefault = true };
         yes.Click += (_, _) => confirm.Close(true);
         no.Click += (_, _) => confirm.Close(false);
         confirm.Content = new StackPanel
@@ -661,7 +662,7 @@ public sealed class ScannerView : UserControl
             Margin = new Thickness(18), Spacing = 14,
             Children =
             {
-                new TextBlock { Text = $"Delete the names, comments, MAC addresses and favorites you saved for {_store.All.Count} device(s)?\nThis can't be undone.", TextWrapping = TextWrapping.Wrap, MaxWidth = 420 },
+                new TextBlock { Text = L.F("Delete the names, comments, MAC addresses and favorites you saved for {0} device(s)?\nThis can't be undone.", _store.All.Count), TextWrapping = TextWrapping.Wrap, MaxWidth = 420 },
                 new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right, Children = { yes, no } },
             },
         };
@@ -669,17 +670,17 @@ public sealed class ScannerView : UserControl
         _store.Clear();
         for (var i = 0; i < _results.Count; i++) _results[i] = _raw.GetValueOrDefault(_results[i].Address, _results[i]);
         Rebuild();
-        ShowInfo("Saved device data deleted.");
+        ShowInfo(L._("Saved device data deleted."));
     }
 
     private async Task ExportAsync(string format, char delimiter, bool selectedOnly = false)
     {
         var hosts = selectedOnly ? _list.SelectedItems?.OfType<HostResult>().ToList() ?? [] : _visible.ToList();
-        if (hosts.Count == 0) { ShowError("Nothing to export."); return; }
+        if (hosts.Count == 0) { ShowError(L._("Nothing to export.")); return; }
         if (TopLevel.GetTopLevel(this)?.StorageProvider is not { } storage) return;
         var file = await storage.SaveFilePickerAsync(new FilePickerSaveOptions
         {
-            Title = "Export scan results",
+            Title = L._("Export scan results"),
             SuggestedFileName = $"Scan_results_{DateTime.Now:yyyy-MM-dd_HHmm}.{format}",
             DefaultExtension = format,
             FileTypeChoices = [new FilePickerFileType(format.ToUpperInvariant()) { Patterns = [$"*.{format}"] }],
@@ -687,14 +688,14 @@ public sealed class ScannerView : UserControl
         if (file?.TryGetLocalPath() is not { } path) return;
         try
         {
-            var text = format == "html" ? Export.ToHtml(hosts, $"Logictail scan {DateTime.Now:yyyy-MM-dd HH:mm}") : Export.ToCsv(hosts, delimiter);
+            var text = format == "html" ? Export.ToHtml(hosts, L.F("Logictail scan {0:yyyy-MM-dd HH:mm}", DateTime.Now)) : Export.ToCsv(hosts, delimiter);
             // UTF-8 with BOM so Excel shows accented names correctly.
             await File.WriteAllTextAsync(path, text, new System.Text.UTF8Encoding(format == "csv"));
-            ShowInfo($"Exported {hosts.Count} device(s) to {path}");
+            ShowInfo(L.F("Exported {0} device(s) to {1}", hosts.Count, path));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            ShowError($"Could not write {path}: {ex.Message}");
+            ShowError(L.F("Could not write {0}: {1}", path, ex.Message));
         }
     }
 
@@ -710,9 +711,9 @@ public sealed class ScannerView : UserControl
         var grid = new Grid { ColumnDefinitions = new ColumnDefinitions(ColumnWidths), Margin = new Thickness(12, 0, 8, 0) };
         (string Text, SortColumn Column)[] columns =
         [
-            ("★", SortColumn.Favorite), ("", SortColumn.Status), ("Name", SortColumn.Name), ("IP", SortColumn.Address),
-            ("Manufacturer", SortColumn.Manufacturer), ("MAC address", SortColumn.Mac), ("Type", SortColumn.Type),
-            ("Services", SortColumn.Services), ("Comments", SortColumn.Comment),
+            ("★", SortColumn.Favorite), ("", SortColumn.Status), (L._("Name"), SortColumn.Name), (L._("IP"), SortColumn.Address),
+            (L._("Manufacturer"), SortColumn.Manufacturer), (L._("MAC address"), SortColumn.Mac), (L._("Type"), SortColumn.Type),
+            (L._("Services"), SortColumn.Services), (L._("Comments"), SortColumn.Comment),
         ];
         for (var i = 0; i < columns.Length; i++)
         {
@@ -782,7 +783,7 @@ public sealed class ScannerView : UserControl
         _details.Children.Clear();
         if (Selected is not { } h)
         {
-            _details.Children.Add(new TextBlock { Text = "Select a device to see its details.\nRight-click for tools; double-click to add a name or comment.", Foreground = Palette.Slate, TextWrapping = TextWrapping.Wrap });
+            _details.Children.Add(new TextBlock { Text = L._("Select a device to see its details.\nRight-click for tools; double-click to add a name or comment."), Foreground = Palette.Slate, TextWrapping = TextWrapping.Wrap });
             return;
         }
 
@@ -793,25 +794,25 @@ public sealed class ScannerView : UserControl
             _details.Children.Add(new TextBlock { Text = label, Foreground = Palette.Slate, FontSize = 11, Margin = new Thickness(0, 6, 0, 0) });
             _details.Children.Add(new SelectableTextBlock { Text = value, TextWrapping = TextWrapping.Wrap });
         }
-        Field("Status", h.Status + (h.Error is { } err ? $" ({err})" : ""));
-        Field("IP address", h.Address.ToString());
-        Field("MAC address", h.Mac);
-        Field("Manufacturer", h.Manufacturer);
-        Field("Type (guess)", DeviceTypes.Label(h.DeviceType));
-        Field("NetBIOS name", h.NetBiosName);
-        Field("Workgroup", h.Workgroup);
-        Field("User", h.User);
-        Field("Services", string.Join("\n", h.Services.Select(s => $"{Services.Label(s.Kind)} (port {Services.Port(s.Kind)}){(s.Detail is null ? "" : ": " + s.Detail)}")));
-        Field("Open ports", string.Join("\n", h.OpenPorts.Select(p =>
-            $"{p.Label}{(p.Service is null ? "" : " " + p.Service)}{(p.State == PortState.OpenOrFiltered ? " (open or filtered)" : "")}{(p.Detail is null ? "" : ": " + p.Detail)}")));
-        Field("Shared", string.Join("\n", h.Shares.Select(s => $"{s.Name}{(s.Kind == ShareKind.Printer ? " (printer)" : "")}{(s.Remark is null ? "" : " - " + s.Remark)}")));
-        Field("Comments", h.Comment);
-        Field("Scanned", h.ScannedAt.ToLocalTime().ToString("g"));
+        Field(L._("Status"), StatusLabel(h.Status) + (h.Error is { } err ? $" ({err})" : ""));
+        Field(L._("IP address"), h.Address.ToString());
+        Field(L._("MAC address"), h.Mac);
+        Field(L._("Manufacturer"), h.Manufacturer);
+        Field(L._("Type (guess)"), DeviceTypes.Label(h.DeviceType));
+        Field(L._("NetBIOS name"), h.NetBiosName);
+        Field(L._("Workgroup"), h.Workgroup);
+        Field(L._("User"), h.User);
+        Field(L._("Services"), string.Join("\n", h.Services.Select(s => Services.Label(s.Kind) + " " + L.F("(port {0})", Services.Port(s.Kind)) + $"{(s.Detail is null ? "" : ": " + s.Detail)}")));
+        Field(L._("Open ports"), string.Join("\n", h.OpenPorts.Select(p =>
+            $"{p.Label}{(p.Service is null ? "" : " " + p.Service)}{(p.State == PortState.OpenOrFiltered ? " " + L._("(open or filtered)") : "")}{(p.Detail is null ? "" : ": " + p.Detail)}")));
+        Field(L._("Shared"), string.Join("\n", h.Shares.Select(s => $"{s.Name}{(s.Kind == ShareKind.Printer ? " " + L._("(printer)") : "")}{(s.Remark is null ? "" : " - " + s.Remark)}")));
+        Field(L._("Comments"), h.Comment);
+        Field(L._("Scanned"), h.ScannedAt.ToLocalTime().ToString("g", L.Culture));
 
         var buttons = new WrapPanel { Margin = new Thickness(0, 10, 0, 0) };
         foreach (var action in Enum.GetValues<HostAction>().Where(a => HostActions.Applies(a, h) && a is not (HostAction.Ping or HostAction.Tracert)))
             buttons.Children.Add(SmallButton(HostActions.Label(action), () => RunAction(action, h)));
-        buttons.Children.Add(SmallButton("Edit...", () => _ = EditAsync(h)));
+        buttons.Children.Add(SmallButton(L._("Edit..."), () => _ = EditAsync(h)));
         buttons.Children.Add(SmallButton(h.IsFavorite ? "★ Favorite" : "☆ Add to favorites", () => ToggleFavorite(h)));
         _details.Children.Add(buttons);
     }
@@ -836,6 +837,8 @@ public sealed class ScannerView : UserControl
     private static readonly IBrush WantedRowBrush = new SolidColorBrush(Color.Parse("#EEF4F5"));
 
     /// <summary>Table text: open port numbers when a port scan ran (answered ports only), else the service names.</summary>
+    private static string StatusLabel(HostStatus s) => L._(s switch { HostStatus.Alive => "Alive", HostStatus.Dead => "Dead", _ => "Unknown" });
+
     private static string ServicesText(HostResult h) => h.OpenPorts.Any(p => p.Confirmed)
         ? string.Join(", ", h.OpenPorts.Where(p => p.Confirmed).Select(p => p.Protocol == PortProtocol.Tcp ? p.Port.ToString() : p.Label))
         : string.Join(", ", h.Services.Select(s => Services.Label(s.Kind)));
@@ -848,16 +851,16 @@ public sealed class ScannerView : UserControl
     private void UpdateStatus(string? state = null)
     {
         _empty.IsVisible = _visible.Count == 0;
-        _empty.Text = _results.Count > 0 ? "No items match your filters." : "No results yet. Enter a range and press Scan.";
+        _empty.Text = L._(_results.Count > 0 ? "No items match your filters." : "No results yet. Enter a range and press Scan.");
 
         var p = _lastProgress;
         _progress.Value = p?.Percent ?? 0;
         _status.Foreground = Palette.Slate;
-        state ??= _cts is null ? _idleState : _gate?.IsPaused == true ? "Paused" : "Scanning...";
+        state ??= _cts is null ? _idleState : L._(_gate?.IsPaused == true ? "Paused" : "Scanning...");
         _status.Text = p is null
             ? state
-            : $"{state}  {p.Percent:0}%  |  {p.Alive} alive, {p.Dead} dead, {p.Unknown} unknown  |  {p.Done:N0} of {p.Total:N0} addresses" +
-              (p.PortsChecked > 0 ? $"  |  {p.PortsChecked:N0} ports checked" : "") + $"  |  showing {_visible.Count:N0}";
+            : $"{state}  {p.Percent:0}%  |  " + L.F("{0} alive, {1} dead, {2} unknown", p.Alive, p.Dead, p.Unknown) + "  |  " + L.F("{0:N0} of {1:N0} addresses", p.Done, p.Total) +
+              (p.PortsChecked > 0 ? "  |  " + L.F("{0:N0} ports checked", p.PortsChecked) : "") + "  |  " + L.F("showing {0:N0}", _visible.Count);
     }
 
     private void ShowInfo(string message)

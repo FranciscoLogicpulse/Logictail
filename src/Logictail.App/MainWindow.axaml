@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:app="clr-namespace:Logictail.App"
+        xmlns:l="clr-namespace:Logictail.App.Loc"
         x:Class="Logictail.App.MainWindow"
         Title="Logictail" Icon="/Assets/logictail.ico" Width="1180" Height="720" MinWidth="640" MinHeight="400"
         Background="{StaticResource Canvas}"
@@ -11,7 +12,7 @@
             BorderBrush="{StaticResource Rule}" BorderThickness="0,0,0,1">
       <DockPanel Margin="8,0,16,0">
         <Button x:Name="SidebarToggle" Classes="quiet" Width="40" Height="40" Click="OnToggleSidebar"
-                ToolTip.Tip="Collapse or expand the sidebar" VerticalAlignment="Center">
+                ToolTip.Tip="{l:Tr 'Collapse or expand the sidebar'}" VerticalAlignment="Center">
           <PathIcon Data="{x:Static app:Palette.IconMenu}" Width="20" Height="20" Foreground="{StaticResource Charcoal}" />
         </Button>
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,20,0" Spacing="8">
@@ -20,43 +21,44 @@
           <TextBlock Text="Logictail" FontSize="17" FontWeight="Bold" VerticalAlignment="Center" />
         </StackPanel>
         <Menu x:Name="MainMenu" VerticalAlignment="Center">
-          <MenuItem Header="_File">
-            <MenuItem Header="_Open..." InputGesture="Ctrl+O" Click="OnOpen" />
-            <MenuItem x:Name="RecentMenu" Header="Open recent _file" />
+          <MenuItem Header="{l:Tr '_File'}">
+            <MenuItem Header="{l:Tr '_Open...'}" InputGesture="Ctrl+O" Click="OnOpen" />
+            <MenuItem x:Name="RecentMenu" Header="{l:Tr 'Open recent _file'}" />
             <Separator />
-            <MenuItem Header="_Close" InputGesture="Ctrl+W" Click="OnClose" />
-            <MenuItem Header="Close o_thers" Click="OnCloseOthers" />
-            <MenuItem Header="Close _all" Click="OnCloseAll" />
+            <MenuItem Header="{l:Tr '_Close'}" InputGesture="Ctrl+W" Click="OnClose" />
+            <MenuItem Header="{l:Tr 'Close o_thers'}" Click="OnCloseOthers" />
+            <MenuItem Header="{l:Tr 'Close _all'}" Click="OnCloseAll" />
             <Separator />
-            <MenuItem Header="E_xit" Click="OnExit" />
+            <MenuItem Header="{l:Tr 'E_xit'}" Click="OnExit" />
           </MenuItem>
-          <MenuItem Header="_Edit">
-            <MenuItem Header="_Copy" InputGesture="Ctrl+C" Click="OnCopy" />
+          <MenuItem Header="{l:Tr '_Edit'}">
+            <MenuItem Header="{l:Tr '_Copy'}" InputGesture="Ctrl+C" Click="OnCopy" />
+            <MenuItem Header="{l:Tr '_Find...'}" InputGesture="Ctrl+F" Click="OnFind" />
           </MenuItem>
-          <MenuItem Header="_View">
-            <MenuItem x:Name="FollowTailItem" Header="Follow _tail" InputGesture="Ctrl+T" ToggleType="CheckBox" Click="OnToggleFollow" />
-            <MenuItem x:Name="EncodingMenu" Header="_Encoding" />
+          <MenuItem Header="{l:Tr '_View'}">
+            <MenuItem x:Name="FollowTailItem" Header="{l:Tr 'Follow _tail'}" InputGesture="Ctrl+T" ToggleType="CheckBox" Click="OnToggleFollow" />
+            <MenuItem x:Name="EncodingMenu" Header="{l:Tr '_Encoding'}" />
             <Separator />
-            <MenuItem x:Name="OnTopItem" Header="Always on to_p" ToggleType="CheckBox" Click="OnToggleOnTop" />
-            <MenuItem Header="_Hide menu" InputGesture="Ctrl+M" Click="OnHideMenu" />
+            <MenuItem x:Name="OnTopItem" Header="{l:Tr 'Always on to_p'}" ToggleType="CheckBox" Click="OnToggleOnTop" />
+            <MenuItem Header="{l:Tr '_Hide menu'}" InputGesture="Ctrl+M" Click="OnHideMenu" />
             <Separator />
-            <MenuItem Header="_Top half" Click="OnTile" Tag="2,0" />
-            <MenuItem Header="_Bottom half" Click="OnTile" Tag="2,1" />
-            <MenuItem Header="_1 Top third" Click="OnTile" Tag="3,0" />
-            <MenuItem Header="_2 Middle third" Click="OnTile" Tag="3,1" />
-            <MenuItem Header="_3 Bottom third" Click="OnTile" Tag="3,2" />
-            <MenuItem Header="A_utomatic size" Click="OnAutoSize" />
+            <MenuItem Header="{l:Tr '_Top half'}" Click="OnTile" Tag="2,0" />
+            <MenuItem Header="{l:Tr '_Bottom half'}" Click="OnTile" Tag="2,1" />
+            <MenuItem Header="{l:Tr '_1 Top third'}" Click="OnTile" Tag="3,0" />
+            <MenuItem Header="{l:Tr '_2 Middle third'}" Click="OnTile" Tag="3,1" />
+            <MenuItem Header="{l:Tr '_3 Bottom third'}" Click="OnTile" Tag="3,2" />
+            <MenuItem Header="{l:Tr 'A_utomatic size'}" Click="OnAutoSize" />
           </MenuItem>
-          <MenuItem Header="_Preferences">
-            <MenuItem Header="_Options..." Click="OnOptions" />
-            <MenuItem Header="_Highlighting..." Click="OnHighlighting" />
+          <MenuItem Header="{l:Tr '_Preferences'}">
+            <MenuItem Header="{l:Tr '_Options...'}" Click="OnOptions" />
+            <MenuItem Header="{l:Tr '_Highlighting...'}" Click="OnHighlighting" />
             <Separator />
-            <MenuItem Header="_Load from file..." Click="OnLoadSettings" />
-            <MenuItem Header="_Save to file..." Click="OnSaveSettings" />
+            <MenuItem Header="{l:Tr '_Load from file...'}" Click="OnLoadSettings" />
+            <MenuItem Header="{l:Tr '_Save to file...'}" Click="OnSaveSettings" />
           </MenuItem>
-          <MenuItem Header="_Help">
-            <MenuItem Header="Command line _usage" Click="OnUsage" />
-            <MenuItem Header="_About Logictail" Click="OnAbout" />
+          <MenuItem Header="{l:Tr '_Help'}">
+            <MenuItem Header="{l:Tr 'Command line _usage'}" Click="OnUsage" />
+            <MenuItem Header="{l:Tr '_About Logictail'}" Click="OnAbout" />
           </MenuItem>
         </Menu>
       </DockPanel>
@@ -66,21 +68,21 @@
     <Border x:Name="Sidebar" DockPanel.Dock="Left" Width="220" Background="{StaticResource Paper}"
             BorderBrush="{StaticResource Rule}" BorderThickness="0,0,1,0">
       <StackPanel Margin="0,12,0,0">
-        <Button x:Name="NavLogs" Classes="nav active" Click="OnNavLogs" ToolTip.Tip="Logs">
+        <Button x:Name="NavLogs" Classes="nav active" Click="OnNavLogs" ToolTip.Tip="{l:Tr 'Logs'}">
           <StackPanel Orientation="Horizontal" Spacing="12">
             <PathIcon Data="{x:Static app:Palette.IconLogs}" Width="18" Height="18" Foreground="{StaticResource Charcoal}" />
-            <TextBlock x:Name="NavLogsText" Text="Logs" VerticalAlignment="Center" />
+            <TextBlock x:Name="NavLogsText" Text="{l:Tr 'Logs'}" VerticalAlignment="Center" />
           </StackPanel>
         </Button>
         <ListBox x:Name="FileList" Classes="files" Background="Transparent" Margin="0,2,0,0" MaxHeight="420" />
         <Button x:Name="OpenFileButton" Classes="quiet" Click="OnOpen" HorizontalAlignment="Stretch"
                 HorizontalContentAlignment="Left" Padding="46,6,12,6" Margin="0,0,0,10">
-          <TextBlock Text="Open a file..." Foreground="{StaticResource Teal}" FontWeight="Bold" />
+          <TextBlock Text="{l:Tr 'Open a file...'}" Foreground="{StaticResource Teal}" FontWeight="Bold" />
         </Button>
-        <Button x:Name="NavNetwork" Classes="nav" Click="OnNavNetwork" ToolTip.Tip="Network">
+        <Button x:Name="NavNetwork" Classes="nav" Click="OnNavNetwork" ToolTip.Tip="{l:Tr 'Network'}">
           <StackPanel Orientation="Horizontal" Spacing="12">
             <PathIcon Data="{x:Static app:Palette.IconNetwork}" Width="18" Height="18" Foreground="{StaticResource Charcoal}" />
-            <TextBlock x:Name="NavNetworkText" Text="Network" VerticalAlignment="Center" />
+            <TextBlock x:Name="NavNetworkText" Text="{l:Tr 'Network'}" VerticalAlignment="Center" />
           </StackPanel>
         </Button>
       </StackPanel>
@@ -96,41 +98,54 @@
           <Border DockPanel.Dock="Top" BorderThickness="0,0,0,1" BorderBrush="{StaticResource Rule}" Padding="10,8">
             <DockPanel>
               <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Spacing="6" Margin="0,0,10,0">
-                <Button x:Name="ToolOpen" Classes="quiet" Click="OnOpen" Padding="8,5" ToolTip.Tip="Open a log file (Ctrl+O)">
+                <Button x:Name="ToolOpen" Classes="quiet" Click="OnOpen" Padding="8,5" ToolTip.Tip="{l:Tr 'Open a log file (Ctrl+O)'}">
                   <StackPanel Orientation="Horizontal" Spacing="6">
                     <PathIcon Width="14" Height="14" Data="M3 6h6l2 2h10v11H3z" Foreground="{StaticResource Teal}" />
-                    <TextBlock Text="Open" VerticalAlignment="Center" />
+                    <TextBlock x:Name="ToolOpenText" Text="{l:Tr 'Open'}" VerticalAlignment="Center" />
                   </StackPanel>
                 </Button>
-                <Button x:Name="ToolHighlighting" Classes="quiet" Click="OnHighlighting" Padding="8,5" ToolTip.Tip="Edit highlighting rules">
+                <Button x:Name="ToolHighlighting" Classes="quiet" Click="OnHighlighting" Padding="8,5" ToolTip.Tip="{l:Tr 'Edit highlighting rules'}">
                   <StackPanel Orientation="Horizontal" Spacing="6">
                     <PathIcon Width="14" Height="14" Data="M15 3l6 6-9 9H6v-6zM3 20h18v2H3z" Foreground="{StaticResource Teal}" />
-                    <TextBlock Text="Highlighting" VerticalAlignment="Center" />
+                    <TextBlock x:Name="ToolHighlightingText" Text="{l:Tr 'Highlighting'}" VerticalAlignment="Center" />
                   </StackPanel>
                 </Button>
-                <CheckBox x:Name="FollowCheck" Content="Follow tail" Margin="6,0,4,0" IsEnabled="False"
-                          Click="OnFollowCheck" ToolTip.Tip="Follow new lines as they arrive (Ctrl+T)" />
-                <ComboBox x:Name="EncodingCombo" Width="120" IsEnabled="False" ToolTip.Tip="Text encoding of this file" />
+                <CheckBox x:Name="FollowCheck" Content="{l:Tr 'Follow tail'}" Margin="6,0,4,0" IsEnabled="False"
+                          Click="OnFollowCheck" ToolTip.Tip="{l:Tr 'Follow new lines as they arrive (Ctrl+T)'}" />
+                <ComboBox x:Name="EncodingCombo" Width="120" IsEnabled="False" ToolTip.Tip="{l:Tr 'Text encoding of this file'}" />
+              </StackPanel>
+              <!-- Find in the log: Enter / F3 next, Shift+Enter / Shift+F3 previous, Esc back to the log. -->
+              <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="2" Margin="10,0,0,0">
+                <TextBox x:Name="SearchBox" Width="190" IsEnabled="False" PlaceholderText="{l:Tr 'Search (Ctrl+F)'}"
+                         ToolTip.Tip="{l:Tr 'Find text in this log: Enter for the next match, Shift+Enter for the previous'}" />
+                <Button x:Name="SearchPrev" Classes="quiet" Padding="6,5" IsEnabled="False" Click="OnSearchPrev"
+                        ToolTip.Tip="{l:Tr 'Previous match (Shift+F3)'}">
+                  <PathIcon Width="12" Height="12" Data="M12 6l8 9h-16z" Foreground="{StaticResource Teal}" />
+                </Button>
+                <Button x:Name="SearchNext" Classes="quiet" Padding="6,5" IsEnabled="False" Click="OnSearchNext"
+                        ToolTip.Tip="{l:Tr 'Next match (F3)'}">
+                  <PathIcon Width="12" Height="12" Data="M12 18l8-9h-16z" Foreground="{StaticResource Teal}" />
+                </Button>
               </StackPanel>
               <!-- The current file's path, where BareTail shows its yellow file bar. -->
               <Border Background="{StaticResource TealMist}" CornerRadius="4" Padding="10,0" MinHeight="32">
                 <SelectableTextBlock x:Name="PathText" VerticalAlignment="Center" TextTrimming="PrefixCharacterEllipsis"
-                                     Text="Open a file to view..." Foreground="{StaticResource Charcoal}" />
+                                     Text="{l:Tr 'Open a file to view...'}" Foreground="{StaticResource Charcoal}" />
               </Border>
             </DockPanel>
           </Border>
           <Border x:Name="LogStatusBar" DockPanel.Dock="Bottom" BorderThickness="0,1,0,0"
                   BorderBrush="{StaticResource Rule}" Padding="14,6">
             <TextBlock x:Name="StatusText" FontSize="12" Foreground="{StaticResource Slate}" VerticalAlignment="Center"
-                       Text="Open a file to start: Ctrl+O, or drop it here." TextTrimming="CharacterEllipsis" />
+                       Text="{l:Tr 'Open a file to start: Ctrl+O, or drop it here.'}" TextTrimming="CharacterEllipsis" />
           </Border>
           <Panel>
             <TabControl x:Name="Tabs" Padding="0" />
 
             <StackPanel x:Name="EmptyLogs" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="12">
-              <TextBlock Text="No log open" FontSize="15" FontWeight="Bold" HorizontalAlignment="Center" />
-              <TextBlock Text="Drop a file here, or open one to follow it as it grows." Foreground="{StaticResource Slate}" HorizontalAlignment="Center" />
-              <Button Classes="primary" Content="Open a file" HorizontalAlignment="Center" Click="OnOpen" Padding="16,8" />
+              <TextBlock Text="{l:Tr 'No log open'}" FontSize="15" FontWeight="Bold" HorizontalAlignment="Center" />
+              <TextBlock Text="{l:Tr 'Drop a file here, or open one to follow it as it grows.'}" Foreground="{StaticResource Slate}" HorizontalAlignment="Center" />
+              <Button Classes="primary" Content="{l:Tr 'Open a file'}" HorizontalAlignment="Center" Click="OnOpen" Padding="16,8" />
             </StackPanel>
           </Panel>
         </DockPanel>

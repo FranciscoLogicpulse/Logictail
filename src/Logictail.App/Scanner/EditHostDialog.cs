@@ -1,3 +1,4 @@
+using Logictail.Core.Localization;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
@@ -11,7 +12,7 @@ public sealed class EditHostDialog : Window
 {
     public EditHostDialog(HostResult host, HostNote? note)
     {
-        Title = $"Edit {host.Address}";
+        Title = L.F("Edit {0}", host.Address);
         Width = 420;
         SizeToContent = SizeToContent.Height;
         CanResize = false;
@@ -22,14 +23,14 @@ public sealed class EditHostDialog : Window
         var mac = new TextBox { Text = note?.Mac ?? (host.Mac is null ? null : ""), PlaceholderText = host.Mac ?? "00-11-22-33-44-55 (for Wake-on-LAN)", IsEnabled = host.Mac is null };
         var error = new TextBlock { Foreground = Brushes.Firebrick };
 
-        var ok = new Button { Content = "OK", IsDefault = true, MinWidth = 80, Classes = { "primary" } };
-        var cancel = new Button { Content = "Cancel", IsCancel = true, MinWidth = 80 };
+        var ok = new Button { Content = L._("OK"), IsDefault = true, MinWidth = 80, Classes = { "primary" } };
+        var cancel = new Button { Content = L._("Cancel"), IsCancel = true, MinWidth = 80 };
         ok.Click += (_, _) =>
         {
             var macText = string.IsNullOrWhiteSpace(mac.Text) ? null : mac.Text.Trim();
             if (macText is not null && new string(macText.Where(Uri.IsHexDigit).ToArray()).Length != 12)
             {
-                error.Text = "MAC address needs 12 hex digits, e.g. 00-11-22-33-44-55.";
+                error.Text = L._("MAC address needs 12 hex digits, e.g. 00-11-22-33-44-55.");
                 return;
             }
             Close(new HostNote
@@ -48,8 +49,8 @@ public sealed class EditHostDialog : Window
             Spacing = 6,
             Children =
             {
-                new TextBlock { Text = "Name:" }, name,
-                new TextBlock { Text = "Comment:" }, comment,
+                new TextBlock { Text = L._("Name:") }, name,
+                new TextBlock { Text = L._("Comment:") }, comment,
                 new TextBlock { Text = host.Mac is null ? "MAC address:" : "MAC address (found by the scan):" }, mac,
                 error,
                 new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 8, 0, 0), Children = { ok, cancel } },

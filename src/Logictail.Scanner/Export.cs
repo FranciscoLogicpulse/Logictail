@@ -1,3 +1,4 @@
+using Logictail.Core.Localization;
 using System.Net;
 using System.Text;
 
@@ -6,12 +7,14 @@ namespace Logictail.Scanner;
 /// <summary>Writes scan results as CSV or HTML.</summary>
 public static class Export
 {
-    private static readonly string[] Headers =
+    private static string[] Headers => HeadersEnglish.Select(L._).ToArray();
+
+    private static readonly string[] HeadersEnglish =
         ["Status", "Name", "IP", "Manufacturer", "MAC address", "Type", "NetBIOS name", "Workgroup", "Services", "Open ports", "Shares", "Comments"];
 
     private static string[] Fields(HostResult h) =>
     [
-        h.Status.ToString(), h.Name ?? "", h.Address.ToString(), h.Manufacturer ?? "", h.Mac ?? "",
+        L._(h.Status.ToString()), h.Name ?? "", h.Address.ToString(), h.Manufacturer ?? "", h.Mac ?? "",
         DeviceTypes.Label(h.DeviceType), h.NetBiosName ?? "", h.Workgroup ?? "",
         string.Join("; ", h.Services.Select(s => s.Detail is null ? Services.Label(s.Kind) : $"{Services.Label(s.Kind)} ({s.Detail})")),
         // Only ports that answered; silent UDP ports are "maybe" and would list every port behind a firewall.

@@ -1,3 +1,4 @@
+using Logictail.Core.Localization;
 using System.Net;
 using System.Net.Sockets;
 
@@ -40,13 +41,13 @@ public static class IpRangeParser
                 var item = raw.Trim();
                 if (item.StartsWith('#')) break; // comment in a targets file
                 if (TryParseItem(item, out var target, out var error)) targets.Add(target);
-                else errors.Add(lines.Length > 1 ? $"Line {lineNo + 1}: {error}" : error);
+                else errors.Add(lines.Length > 1 ? L.F("Line {0}: {1}", lineNo + 1, error) : error);
             }
         }
 
         var total = targets.Sum(t => t is ScanTarget.Range r ? r.Count : 1);
         if (total > MaxAddresses)
-            errors.Add($"{total:N0} addresses is more than the {MaxAddresses:N0} allowed in one scan");
+            errors.Add(L.F("{0:N0} addresses is more than the {1:N0} allowed in one scan", total, MaxAddresses));
         return new ParseResult(targets, errors);
     }
 
@@ -90,7 +91,7 @@ public static class IpRangeParser
                 target = new ScanTarget.Range(first, last);
                 return true;
             }
-            error = $"\"{item}\" is not a valid subnet (example: 192.168.0.0/24)";
+            error = L.F("\"{0}\" is not a valid subnet (example: 192.168.0.0/24)", item);
             return false;
         }
 
@@ -101,8 +102,8 @@ public static class IpRangeParser
             var rest = item[(dash + 1)..];
             uint end;
             if (byte.TryParse(rest, out var lastOctet)) end = (start & 0xFFFFFF00) | lastOctet;
-            else if (!TryParseV4(rest, out end)) { error = $"\"{item}\" is not a valid range (example: 192.168.0.1-100)"; return false; }
-            if (end < start) { error = $"\"{item}\" ends before it starts"; return false; }
+            else if (!TryParseV4(rest, out end)) { error = L.F("\"{0}\" is not a valid range (example: 192.168.0.1-100)", item); return false; }
+            if (end < start) { error = L.F("\"{0}\" ends before it starts", item); return false; }
             target = new ScanTarget.Range(start, end);
             return true;
         }
@@ -119,7 +120,7 @@ public static class IpRangeParser
             return true;
         }
 
-        error = $"\"{item}\" is not an IP address, range or host name";
+        error = L.F("\"{0}\" is not an IP address, range or host name", item);
         return false;
     }
 

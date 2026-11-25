@@ -1,5 +1,7 @@
 using Avalonia;
+using System.Runtime.CompilerServices;
 using Avalonia.Headless;
+using Logictail.Core.Localization;
 using Logictail.App.Tests;
 
 [assembly: AvaloniaTestApplication(typeof(TestApp))]
@@ -13,4 +15,11 @@ public static class TestApp
         AppBuilder.Configure<App>()
             .UseSkia()
             .UseHeadless(new AvaloniaHeadlessPlatformOptions { UseHeadlessDrawing = false });
+}
+
+internal static class EnglishForTests
+{
+    // Assertions use the English text; UiReviewTests renders Portuguese too.
+    [ModuleInitializer]
+    internal static void Init() => L.Default = Language.English;
 }

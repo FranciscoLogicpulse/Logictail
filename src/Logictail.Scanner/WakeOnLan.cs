@@ -1,3 +1,4 @@
+using Logictail.Core.Localization;
 using System.Net;
 using System.Net.Sockets;
 
@@ -9,7 +10,7 @@ public static class WakeOnLan
     public static byte[] MagicPacket(string mac)
     {
         var hex = new string(mac.Where(Uri.IsHexDigit).ToArray());
-        if (hex.Length != 12) throw new ArgumentException($"\"{mac}\" is not a MAC address", nameof(mac));
+        if (hex.Length != 12) throw new ArgumentException(L.F("\"{0}\" is not a MAC address", mac), nameof(mac));
         var bytes = Convert.FromHexString(hex);
         var packet = new byte[6 + 16 * 6];
         Array.Fill(packet, (byte)0xFF, 0, 6);

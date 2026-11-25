@@ -1,3 +1,4 @@
+using Logictail.Core.Localization;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
@@ -131,7 +132,7 @@ public sealed class LogTab
 
     private void UpdateHeader()
     {
-        _header.Text = Status == FileStatus.Error ? $"{File.Name} (error)" : $"{File.Name} ({FormatSize(File.Length)})";
+        _header.Text = Status == FileStatus.Error ? L.F("{0} (error)", File.Name) : $"{File.Name} ({FormatSize(File.Length)})";
         switch (Status)
         {
             case FileStatus.Changed: _header.Foreground = Brushes.DarkOrange; break;
@@ -184,9 +185,9 @@ public sealed class LogTab
 
     public static string FormatSize(long bytes) => bytes switch
     {
-        < 1024 => $"{bytes} bytes",
-        < 1024 * 1024 => $"{bytes / 1024.0:0.0} KB",
-        < 1024L * 1024 * 1024 => $"{bytes / (1024.0 * 1024):0.0} MB",
-        _ => $"{bytes / (1024.0 * 1024 * 1024):0.0} GB",
+        < 1024 => L.F("{0} bytes", bytes),
+        < 1024 * 1024 => (bytes / 1024.0).ToString("0.0", L.Culture) + " KB",
+        < 1024L * 1024 * 1024 => (bytes / (1024.0 * 1024)).ToString("0.0", L.Culture) + " MB",
+        _ => (bytes / (1024.0 * 1024 * 1024)).ToString("0.0", L.Culture) + " GB",
     };
 }

@@ -9,6 +9,7 @@ using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Logictail.App.Dialogs;
 using Logictail.App.Scanner;
+using Logictail.Core.Localization;
 using Logictail.Core.Settings;
 using Logictail.Scanner;
 
@@ -25,6 +26,19 @@ public sealed class UiReviewTests : IDisposable
     public static readonly int[] Widths = [1180, 960, 800, 680];
 
     public void Dispose() => Directory.Delete(_dir, recursive: true);
+
+    /// <summary>Sets the app-wide language (not a scoped one) so text built later in dispatcher callbacks matches too.</summary>
+    private static Restore AppLanguage(Language language)
+    {
+        var previous = L.Default;
+        L.Default = language;
+        return new Restore(() => L.Default = previous);
+    }
+
+    private sealed class Restore(Action undo) : IDisposable
+    {
+        public void Dispose() => undo();
+    }
 
     private static void Pump(int times = 6)
     {
@@ -69,9 +83,12 @@ public sealed class UiReviewTests : IDisposable
         _ => c.GetType().Name + (c.Name is { } n ? $"#{n}" : ""),
     };
 
-    [AvaloniaFact]
-    public async Task Network_screen_has_no_overlaps_at_any_width()
+    [AvaloniaTheory]
+    [InlineData(Language.Portuguese)]
+    [InlineData(Language.English)]
+    public async Task Network_screen_has_no_overlaps_at_any_width(Language language)
     {
+        using var lang = AppLanguage(language);
         var all = new List<string>();
         foreach (var width in Widths)
         {
@@ -87,16 +104,19 @@ public sealed class UiReviewTests : IDisposable
             Pump();
             view.Select(view.VisibleResults[0]);
             Pump();
-            window.CaptureRenderedFrame()?.Save(Path.Combine(ShotDir, $"review-network-{width}.png"));
+            window.CaptureRenderedFrame()?.Save(Path.Combine(ShotDir, $"review-network-{L.Code(language)}-{width}.png"));
             all.AddRange(Problems(window, window).Select(p => $"network @{width}: {p}"));
             window.Close();
         }
         Assert.True(all.Count == 0, string.Join("\n", all));
     }
 
-    [AvaloniaFact]
-    public void Logs_screen_has_no_overlaps_at_any_width()
+    [AvaloniaTheory]
+    [InlineData(Language.Portuguese)]
+    [InlineData(Language.English)]
+    public void Logs_screen_has_no_overlaps_at_any_width(Language language)
     {
+        using var lang = AppLanguage(language);
         var a = Path.Combine(_dir, "orders-api.log");
         var b = Path.Combine(_dir, "db-sync.log");
         File.WriteAllLines(a, Enumerable.Range(0, 200).Select(i => $"2026-11-25 14:00:{i % 60:00} INFO  request {i} completed" + (i % 9 == 0 ? " ERROR timeout" : "")));
@@ -107,16 +127,19 @@ public sealed class UiReviewTests : IDisposable
             var window = new MainWindow(new SettingsStore(_dir, _dir, _dir), new AppSettings(), CommandLine.Parse([b, a])) { Width = width, Height = 560 };
             window.Show();
             Pump(10);
-            window.CaptureRenderedFrame()?.Save(Path.Combine(ShotDir, $"review-logs-{width}.png"));
+            window.CaptureRenderedFrame()?.Save(Path.Combine(ShotDir, $"review-logs-{L.Code(language)}-{width}.png"));
             all.AddRange(Problems(window, window).Select(p => $"logs @{width}: {p}"));
             window.Close();
         }
         Assert.True(all.Count == 0, string.Join("\n", all));
     }
 
-    [AvaloniaFact]
-    public void Dialogs_have_no_overlaps()
+    [AvaloniaTheory]
+    [InlineData(Language.Portuguese)]
+    [InlineData(Language.English)]
+    public void Dialogs_have_no_overlaps(Language language)
     {
+        using var lang = AppLanguage(language);
         var owner = new Window();
         owner.Show();
         var all = new List<string>();
@@ -130,7 +153,7 @@ public sealed class UiReviewTests : IDisposable
         {
             _ = dialog.ShowDialog(owner);
             Pump();
-            dialog.CaptureRenderedFrame()?.Save(Path.Combine(ShotDir, $"review-{dialog.GetType().Name}.png"));
+            dialog.CaptureRenderedFrame()?.Save(Path.Combine(ShotDir, $"review-{dialog.GetType().Name}-{L.Code(language)}.png"));
             all.AddRange(Problems(dialog, dialog).Select(p => $"{dialog.GetType().Name}: {p}"));
             dialog.Close();
         }

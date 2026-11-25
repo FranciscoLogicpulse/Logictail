@@ -1,3 +1,4 @@
+using Logictail.Core.Localization;
 namespace Logictail.Scanner;
 
 public enum PortProtocol { Tcp, Udp }
@@ -43,7 +44,7 @@ public static class PortListParser
                 var proto = item[..colon].Trim().ToUpperInvariant();
                 if (proto is "U" or "UD" or "UDP") current = udp;
                 else if (proto is "T" or "TC" or "TCP") current = tcp;
-                else { errors.Add($"\"{item}\": use TCP: or UDP: before ports"); continue; }
+                else { errors.Add(L.F("\"{0}\": use TCP: or UDP: before ports", item)); continue; }
                 item = item[(colon + 1)..].Trim();
                 if (item.Length == 0) continue;
             }
@@ -51,7 +52,7 @@ public static class PortListParser
             var dash = item.IndexOf('-');
             if (dash > 0 && int.TryParse(item[..dash].Trim(), out var from) && int.TryParse(item[(dash + 1)..].Trim(), out var to))
             {
-                if (from < 1 || to > 65535 || from > to) { errors.Add($"\"{item}\" is not a valid port range (1-65535)"); continue; }
+                if (from < 1 || to > 65535 || from > to) { errors.Add(L.F("\"{0}\" is not a valid port range (1-65535)", item)); continue; }
                 for (var p = from; p <= to; p++) current.Add(p);
             }
             else if (int.TryParse(item, out var port) && port is >= 1 and <= 65535)
@@ -60,7 +61,7 @@ public static class PortListParser
             }
             else
             {
-                errors.Add($"\"{item}\" is not a port or range (example: 80, 443, 8000-8100, UDP: 53)");
+                errors.Add(L.F("\"{0}\" is not a port or range (example: 80, 443, 8000-8100, UDP: 53)", item));
             }
         }
         return new PortParseResult(new PortList([.. tcp], [.. udp]), errors);

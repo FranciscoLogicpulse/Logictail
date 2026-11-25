@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Logictail.Core.Localization;
 using Logictail.Core.Settings;
 
 namespace Logictail.App;
@@ -16,6 +17,7 @@ public partial class App : Application
             SettingsStore.MigrateFromOldName(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData));
             var store = SettingsStore.ForCurrentUser();
             var settings = store.Load();
+            L.Default = settings.Language; // before any window builds its text
             var commandLine = CommandLine.Parse(desktop.Args ?? []);
             desktop.MainWindow = new MainWindow(store, settings, commandLine);
         }

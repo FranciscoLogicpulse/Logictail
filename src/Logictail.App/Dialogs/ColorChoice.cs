@@ -1,3 +1,4 @@
+using Logictail.Core.Localization;
 using System.Globalization;
 using Avalonia.Controls;
 using Avalonia.Layout;
@@ -21,7 +22,7 @@ public sealed class ColorChoice : StackPanel
     ];
 
     private readonly ComboBox _combo = new() { Width = 150 };
-    private readonly TextBox _hex = new() { Width = 90, PlaceholderText = "#RRGGBB" };
+    private readonly TextBox _hex = new() { Width = 90, PlaceholderText = L._("#RRGGBB") };
     private readonly Border _swatch = new() { Width = 22, Height = 22, BorderBrush = Brushes.Gray, BorderThickness = new(1) };
     private bool _updating;
     private uint _value;
@@ -30,7 +31,7 @@ public sealed class ColorChoice : StackPanel
     {
         Orientation = Orientation.Horizontal;
         Spacing = 6;
-        _combo.ItemsSource = Named.Select(n => n.Name).Append("Custom").ToList();
+        _combo.ItemsSource = Named.Select(n => L._(n.Name)).Append(L._("Custom")).ToList();
         _combo.SelectionChanged += (_, _) =>
         {
             if (_updating || _combo.SelectedIndex < 0 || _combo.SelectedIndex >= Named.Length) return;

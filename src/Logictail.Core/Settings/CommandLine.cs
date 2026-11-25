@@ -1,3 +1,4 @@
+using Logictail.Core.Localization;
 using System.Globalization;
 
 namespace Logictail.Core.Settings;
@@ -17,7 +18,9 @@ public sealed record CommandLine(
     WindowStateKind? State,
     IReadOnlyList<string> Errors)
 {
-    public const string Usage =
+    public static string Usage => L._(UsageEnglish);
+
+    internal const string UsageEnglish =
         "Usage: Logictail [files...] [options]\n\n" +
         "  --tile-window-count N      Split the screen into N equal rows\n" +
         "  --tile-window-index I      Put this window in row I (0-based)\n" +
@@ -44,7 +47,7 @@ public sealed record CommandLine(
             var eq = arg.IndexOf('=');
             var name = eq > 0 ? arg[..eq] : arg;
             string? value = eq > 0 ? arg[(eq + 1)..] : i + 1 < args.Count ? args[++i] : null;
-            if (value is null) { errors.Add($"{name} needs a value"); continue; }
+            if (value is null) { errors.Add(L.F("{0} needs a value", name)); continue; }
 
             switch (name.ToLowerInvariant())
             {
@@ -57,12 +60,12 @@ public sealed record CommandLine(
                 case "--window-state" when Enum.TryParse<WindowStateKind>(value, ignoreCase: true, out var s):
                     state = s; break;
                 default:
-                    errors.Add($"Invalid option: {arg}{(eq > 0 ? "" : " " + value)}"); break;
+                    errors.Add(L.F("Invalid option: {0}", arg + (eq > 0 ? "" : " " + value))); break;
             }
         }
 
-        if (index is not null && count is null) errors.Add("--tile-window-index needs --tile-window-count");
-        if (index >= count) errors.Add("--tile-window-index must be less than --tile-window-count");
+        if (index is not null && count is null) errors.Add(L._("--tile-window-index needs --tile-window-count"));
+        if (index >= count) errors.Add(L._("--tile-window-index must be less than --tile-window-count"));
         return new CommandLine(files, count, index, position, state, errors);
     }
 

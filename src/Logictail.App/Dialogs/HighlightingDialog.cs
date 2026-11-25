@@ -1,3 +1,4 @@
+using Logictail.Core.Localization;
 using System.Collections.ObjectModel;
 using Avalonia;
 using Avalonia.Controls;
@@ -13,24 +14,24 @@ public sealed class HighlightingDialog : Window
 {
     private readonly ObservableCollection<HighlightRule> _rules;
     private readonly ListBox _list = new() { MinWidth = 260, MaxHeight = 360 }; // scrolls instead of growing off-screen
-    private readonly TextBox _pattern = new() { PlaceholderText = "Text to match" };
-    private readonly CheckBox _ignoreCase = new() { Content = "_Ignore case" };
-    private readonly CheckBox _invert = new() { Content = "In_vert match (style lines that don't match)" };
-    private readonly CheckBox _regex = new() { Content = "_Regular expression" };
-    private readonly CheckBox _bold = new() { Content = "B_old" };
-    private readonly CheckBox _italic = new() { Content = "I_talic" };
+    private readonly TextBox _pattern = new() { PlaceholderText = L._("Text to match") };
+    private readonly CheckBox _ignoreCase = new() { Content = L._("_Ignore case") };
+    private readonly CheckBox _invert = new() { Content = L._("In_vert match (style lines that don't match)") };
+    private readonly CheckBox _regex = new() { Content = L._("_Regular expression") };
+    private readonly CheckBox _bold = new() { Content = L._("B_old") };
+    private readonly CheckBox _italic = new() { Content = L._("I_talic") };
     private readonly ColorChoice _fg = new();
     private readonly ColorChoice _bg = new();
     private readonly TextBlock _regexError = new() { Foreground = Brushes.Firebrick, TextWrapping = TextWrapping.Wrap, IsVisible = false };
-    private readonly Button _delete = new() { Content = "D_elete" };
-    private readonly Button _up = new() { Content = "Move _Up" };
-    private readonly Button _down = new() { Content = "Move _Down" };
+    private readonly Button _delete = new() { Content = L._("D_elete") };
+    private readonly Button _up = new() { Content = L._("Move _Up") };
+    private readonly Button _down = new() { Content = L._("Move _Down") };
     private readonly StackPanel _editor;
     private bool _loading;
 
     public HighlightingDialog(IEnumerable<HighlightRule> rules)
     {
-        Title = "Highlighting";
+        Title = L._("Highlighting");
         Width = 760;
         SizeToContent = SizeToContent.Height;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -44,7 +45,7 @@ public sealed class HighlightingDialog : Window
             Padding = new Thickness(6, 3),
             Child = new TextBlock
             {
-                Text = (rule.Invert ? "NOT " : "") + (rule.IsRegex ? $"/{rule.Pattern}/" : rule.Pattern),
+                Text = (rule.Invert ? L._("NOT") + " " : "") + (rule.IsRegex ? $"/{rule.Pattern}/" : rule.Pattern),
                 Foreground = new SolidColorBrush(Color.FromUInt32(rule.Foreground)),
                 FontWeight = rule.Bold ? FontWeight.Bold : FontWeight.Normal,
                 FontStyle = rule.Italic ? FontStyle.Italic : FontStyle.Normal,
@@ -53,7 +54,7 @@ public sealed class HighlightingDialog : Window
         });
         _list.SelectionChanged += (_, _) => LoadSelected();
 
-        var add = new Button { Content = "_Add" };
+        var add = new Button { Content = L._("_Add") };
         add.Click += (_, _) =>
         {
             _rules.Add(new HighlightRule { Pattern = "new rule" });
@@ -90,24 +91,24 @@ public sealed class HighlightingDialog : Window
             Margin = new Thickness(16, 0, 0, 0),
             Children =
             {
-                new TextBlock { Text = "String:" },
+                new TextBlock { Text = L._("String:") },
                 _pattern,
                 _regexError,
                 _ignoreCase, _invert, _regex, _bold, _italic,
-                new TextBlock { Text = "Foreground color:", Margin = new Thickness(0, 6, 0, 0) },
+                new TextBlock { Text = L._("Foreground color:"), Margin = new Thickness(0, 6, 0, 0) },
                 _fg,
-                new TextBlock { Text = "Background color:" },
+                new TextBlock { Text = L._("Background color:") },
                 _bg,
                 new TextBlock
                 {
-                    Text = "The first rule in the list that matches a line sets its colors.",
+                    Text = L._("The first rule in the list that matches a line sets its colors."),
                     Foreground = Brushes.Gray, Margin = new Thickness(0, 10, 0, 0), TextWrapping = TextWrapping.Wrap,
                 },
             },
         };
 
-        var ok = new Button { Content = "OK", IsDefault = true, MinWidth = 80, Classes = { "primary" } };
-        var cancel = new Button { Content = "Cancel", IsCancel = true, MinWidth = 80 };
+        var ok = new Button { Content = L._("OK"), IsDefault = true, MinWidth = 80, Classes = { "primary" } };
+        var cancel = new Button { Content = L._("Cancel"), IsCancel = true, MinWidth = 80 };
         ok.Click += (_, _) => Close(_rules.ToList());
         cancel.Click += (_, _) => Close(null);
         var bottom = new StackPanel
@@ -182,7 +183,7 @@ public sealed class HighlightingDialog : Window
         _regexError.IsVisible = false;
         if (!rule.IsRegex) return;
         try { _ = new System.Text.RegularExpressions.Regex(rule.Pattern); }
-        catch (ArgumentException ex) { _regexError.Text = "Invalid regular expression: " + ex.Message; _regexError.IsVisible = true; }
+        catch (ArgumentException ex) { _regexError.Text = L._("Invalid regular expression: ") + ex.Message; _regexError.IsVisible = true; }
     }
 
     private void Move(int delta)

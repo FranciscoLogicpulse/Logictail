@@ -1,4 +1,5 @@
 using Logictail.Core.Highlighting;
+using Logictail.Core.Localization;
 
 namespace Logictail.Core.Settings;
 
@@ -23,6 +24,9 @@ public sealed class AppSettings
 {
     public const int WrapOff = 0;
     public const int WrapAuto = -1;
+
+    /// <summary>Interface language. Portuguese (Portugal) unless English is chosen in Options.</summary>
+    public Language Language { get; set; } = Language.Portuguese;
 
     // Font and layout
     public string FontFamily { get; set; } = "Cascadia Mono, Consolas, Courier New";
