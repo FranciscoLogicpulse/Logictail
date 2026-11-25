@@ -1,0 +1,26 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Logitail.App.MainWindow"
+        Title="Logitail" Width="1100" Height="700"
+        DragDrop.AllowDrop="True">
+  <DockPanel>
+    <Menu DockPanel.Dock="Top">
+      <MenuItem Header="_File">
+        <MenuItem Header="_Open..." InputGesture="Ctrl+O" Click="OnOpen" />
+        <MenuItem Header="_Close" InputGesture="Ctrl+W" Click="OnClose" />
+        <MenuItem Header="Close _Others" Click="OnCloseOthers" />
+        <MenuItem Header="Close _All" Click="OnCloseAll" />
+        <Separator />
+        <MenuItem Header="E_xit" Click="OnExit" />
+      </MenuItem>
+      <MenuItem Header="_View">
+        <MenuItem x:Name="FollowTailItem" Header="Follow _Tail" InputGesture="Ctrl+T" ToggleType="CheckBox" Click="OnToggleFollow" />
+        <MenuItem x:Name="EncodingMenu" Header="_Encoding" />
+      </MenuItem>
+    </Menu>
+    <Border DockPanel.Dock="Bottom" BorderThickness="0,1,0,0" BorderBrush="#ddd" Padding="8,3">
+      <TextBlock x:Name="StatusText" Text="Open a file to view (Ctrl+O or drag and drop)" />
+    </Border>
+    <TabControl x:Name="Tabs" Padding="0" />
+  </DockPanel>
+</Window>
