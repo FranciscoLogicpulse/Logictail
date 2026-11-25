@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Logictail.App/Logictail.App.csproj" />
+    <Project Path="src/Logictail.Core/Logictail.Core.csproj" />
+    <Project Path="src/Logictail.Scanner/Logictail.Scanner.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Logictail.App.Tests/Logictail.App.Tests.csproj" />
+    <Project Path="tests/Logictail.Tests/Logictail.Tests.csproj" />
+  </Folder>
+</Solution>

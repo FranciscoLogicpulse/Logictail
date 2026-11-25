@@ -1,15 +1,15 @@
-# Logitail — feature spec
+# Logictail — feature spec
 
-Logitail is a from-scratch Windows desktop app for personal use: a real-time log viewer in the spirit of BareTail, with a built-in network scanner tab modeled on Advanced IP Scanner's feature set.
+Logictail is a from-scratch Windows desktop app for personal use: a real-time log viewer in the spirit of BareTail, with a built-in network scanner tab modeled on Advanced IP Scanner's feature set.
 
 ## Clean-room rule
 
-Both reference programs were studied **statically** with REA (strings, imports, resources, installer inventory). Neither was run. This spec records *what they do*; Logitail implements it independently.
+Both reference programs were studied **statically** with REA (strings, imports, resources, installer inventory). Neither was run. This spec records *what they do*; Logictail implements it independently.
 
-Lines marked **(design)** are not observed in the binaries: they are Logitail decisions or inferences, and can change.
+Lines marked **(design)** are not observed in the binaries: they are Logictail decisions or inferences, and can change.
 
-- No decompiled code, icons, bitmaps, templates or data files from either program go into Logitail.
-- Names, branding and look are Logitail's own. The UI gets a full redesign at the end.
+- No decompiled code, icons, bitmaps, templates or data files from either program go into Logictail.
+- Names, branding and look are Logictail's own. The UI gets a full redesign at the end.
 - The MAC vendor list comes from the public IEEE OUI registry, downloaded only with the owner's OK.
 
 ## Evidence sources
@@ -53,11 +53,11 @@ Lines marked **(design)** are not observed in the binaries: they are Logitail de
 - Each rule: match string, ignore case, invert match, foreground color, background color, bold, italic.
 - Named colors: Black, White, Red, Green, Blue, Yellow, Cyan, Magenta, Dark Red, Dark Green, Dark Blue, Dark Yellow, Dark Cyan, Dark Magenta, Gray 1–7, plus Custom (system color picker).
 - A matching line is drawn with the rule's style. **(design)** First matching rule in list order wins; BareTail's precedence was not confirmed.
-- *Logitail extension:* optional regex match mode (BareTail free only does substring matching).
+- *Logictail extension:* optional regex match mode (BareTail free only does substring matching).
 
 ### 1.4 Window and layout
 - Always on top; hide main menu; remember window position, size and state.
-- View presets for tiling several Logitail windows: top half, bottom half, top/middle/bottom third, automatic size.
+- View presets for tiling several Logictail windows: top half, bottom half, top/middle/bottom third, automatic size.
 - Command line: open files given as arguments; `--tile-window-count`, `--tile-window-index`, `--window-position`, `--window-state`.
 - Help menu items worth keeping in some form: command-line usage.
 
@@ -65,11 +65,11 @@ Lines marked **(design)** are not observed in the binaries: they are Logitail de
 - Options dialog covering everything above, with Restore Defaults.
 - Save settings on exit: never / to file in working directory / to file next to the app / to user profile.
 - Load/save highlighting and preferences to and from a file.
-- *Logitail change:* settings are a JSON file in `%APPDATA%\Logitail`, not the registry.
+- *Logictail change:* settings are a JSON file in `%APPDATA%\Logictail`, not the registry.
 
 ### 1.6 Left out on purpose
 - Splash screen, nag text, "Pro" upsell, website/registration links, update pinging.
-- BareTailPro features (search, real-time filtering) are **not** in BareTail free, but are good candidates for Logitail later.
+- BareTailPro features (search, real-time filtering) are **not** in BareTail free, but are good candidates for Logictail later.
 
 ---
 
@@ -82,7 +82,7 @@ Lines marked **(design)** are not observed in the binaries: they are Logitail de
 - Start / Stop / Pause / Resume. Progress: `%`, alive, dead, unknown counts.
 - Speed setting (fast vs high-accuracy), thread count, timeouts.
 - **(design)** Default scope: the user's own subnet.
-- Console mode (separate exe in the original): `/r:<range>` or `/s:<file>`, `/f:<output file>`, `/v` to include services. **(design)** In Logitail: `logitail scan …` CLI subcommand, low priority.
+- Console mode (separate exe in the original): `/r:<range>` or `/s:<file>`, `/f:<output file>`, `/v` to include services. **(design)** In Logictail: `logictail scan …` CLI subcommand, low priority.
 
 ### 2.2 Per-host discovery
 - Alive check: ICMP echo, plus ARP for local-subnet hosts.
@@ -91,7 +91,7 @@ Lines marked **(design)** are not observed in the binaries: they are Logitail de
 - Services detected: HTTP (with page title), HTTPS, HTTP on 8080, FTP, RDP. (SSH and Telnet appear only as client launchers, not scan options.)
 - Shared folders and printers (SMB).
 - Needs Windows credentials on the remote host ("Use Windows authentication", user name): logged-on user, OS, date/time/time zone, admin shares. **Scope question for the owner.**
-- Device type labels exist (router, printer, access point, media device, game console, load balancer, proxy…). **(design)** How the original assigns them is unknown; Logitail would guess from vendor and open services.
+- Device type labels exist (router, printer, access point, media device, game console, load balancer, proxy…). **(design)** How the original assigns them is unknown; Logictail would guess from vendor and open services.
 - Remembered data across scans: user-edited names, comments, MAC addresses.
 
 ### 2.3 Results view
@@ -140,10 +140,10 @@ the IP Scanner's to isolate what's new) and the console exe's help. Not run.
 - Console mode: `/r:<range>` or `/s:<file>`, `/p:<ports>`, `/f:<output file>`.
 - Service versions come from a compressed probe database (`service_probes`); its format wasn't decoded.
 
-### 3.2 Logitail design
+### 3.2 Logictail design
 - Part of the Network screen, not a separate tool: an optional **Ports** field next to From/To. Empty means no port
   scan (only the built-in service checks). Filled, every live host is also port-scanned.
-- **(design)** Presets menu: common ports (Logitail's own list of ~40), well-known (1-1023), all (1-65535).
+- **(design)** Presets menu: common ports (Logictail's own list of ~40), well-known (1-1023), all (1-65535).
 - **(design)** Same syntax as the original, plus `TCP:` to switch back. Max 65,535 ports per protocol.
 - **(design)** Right-click a device: "Scan ports..." for that one device.
 - **(design)** Service names from a hand-written table of well-known ports; versions from the first line the
@@ -156,10 +156,10 @@ the IP Scanner's to isolate what's new) and the console exe's help. Not run.
 ## Architecture
 
 - **.NET 10**, **Avalonia** UI (cross-platform capable; Windows is the target).
-- `Logitail.Core`: tail engine (line-offset index, incremental reads, encoding decode, rotation handling), highlight rules, settings. No UI dependencies.
-- `Logitail.Scanner`: range parser, ping/ARP/DNS/NetBIOS probes, service checks, OUI lookup, favorites, export. No UI dependencies.
-- `Logitail.App`: thin Avalonia shell, MVVM. Built to be thrown away and redesigned at the end.
-- `Logitail.Tests`: unit tests for the engine and scanner logic (growth, truncation, rotation, encodings, range parsing, rule matching).
+- `Logictail.Core`: tail engine (line-offset index, incremental reads, encoding decode, rotation handling), highlight rules, settings. No UI dependencies.
+- `Logictail.Scanner`: range parser, ping/ARP/DNS/NetBIOS probes, service checks, OUI lookup, favorites, export. No UI dependencies.
+- `Logictail.App`: thin Avalonia shell, MVVM. Built to be thrown away and redesigned at the end.
+- `Logictail.Tests`: unit tests for the engine and scanner logic (growth, truncation, rotation, encodings, range parsing, rule matching).
 
 ## Build order
 

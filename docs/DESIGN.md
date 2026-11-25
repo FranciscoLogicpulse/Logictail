@@ -1,4 +1,4 @@
-# Logitail design
+# Logictail design
 
 Brief: resemble LogicERP (the owner's company web app), sidebar navigation, teal accent.
 Subject: a desk tool someone keeps open all day beside other work, watching logs scroll and occasionally
@@ -29,7 +29,7 @@ because columns of log text must align. Scale: 12 (column headers, captions), 13
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│ [≡]  ▌Logitail    File Edit View Preferences Help    [Following] │  header 56, white, rule below
+│ [≡]  ▌Logictail    File Edit View Preferences Help    [Following] │  header 56, white, rule below
 ├──────────────┬───────────────────────────────────────────────────┤
 │ ▤ Logs       │ ┌───────────────────────────────────────────────┐ │
 │   app.log  3 │ │ log text, Cascadia Mono                      │ │  canvas, 16 padding
@@ -63,5 +63,5 @@ Left aligned throughout. The sidebar replaces the file tab strip (the strip can 
 ## Assets
 
 - Montserrat font files are copied from LogicERP's portal (`wwwroot/fonts`). Montserrat is under the SIL Open
-  Font License 1.1, (c) 2011 The Montserrat Project Authors. See `src/Logitail.App/Assets/Fonts/NOTICE.txt`.
-- No LogicERP or Logicpulse logos, images or icon files are used. Logitail's mark and sidebar icons are drawn in code.
+  Font License 1.1, (c) 2011 The Montserrat Project Authors. See `src/Logictail.App/Assets/Fonts/NOTICE.txt`.
+- No LogicERP or Logicpulse logos, images or icon files are used. Logictail's mark and sidebar icons are drawn in code.
