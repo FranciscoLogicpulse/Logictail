@@ -47,6 +47,7 @@ public sealed class ScannerView : UserControl
     private readonly CheckBox _favoritesOnly = new() { Content = "_Favorites only", IsChecked = false };
     private readonly CheckBox _listShares = new() { Content = "Shares", IsChecked = false };
     private readonly TextBox _search = new() { PlaceholderText = "Search results", Width = 220 };
+    private readonly TextBox _ports = new() { PlaceholderText = "No port scan (e.g. 22, 80, 443, UDP: 53)", Width = 280 };
     private readonly ListBox _list = new() { SelectionMode = SelectionMode.Multiple };
     private readonly StackPanel _details = new() { Spacing = 4, Margin = new Thickness(12) };
     private readonly ProgressBar _progress = new() { Minimum = 0, Maximum = 100, Width = 200, Height = 6 };
@@ -146,11 +147,28 @@ public sealed class ScannerView : UserControl
             toolbar.Children.Add(tools[i]);
         }
         // Labels sit close to their own box and apart from the previous one.
-        tools[0].Margin = new Thickness(0, 0, 8, 0);
-        tools[2].Margin = new Thickness(14, 0, 8, 0);
+        tools[0].Margin = new Thickness(0, 0, 10, 0);
+        tools[2].Margin = new Thickness(14, 0, 10, 0);
         tools[1].Margin = tools[3].Margin = new Thickness(0);
         var filters = new WrapPanel { Margin = new Thickness(14, 0, 14, 8) };
-        foreach (var c in new Control[] { _search, _showAlive, _showDead, _showUnknown, _favoritesOnly })
+        var presets = new Button { Content = "Presets" };
+        presets.Flyout = new MenuFlyout
+        {
+            Items =
+            {
+                MenuItem("Common ports", () => _ports.Text = PortList.Common),
+                MenuItem("Well-known TCP ports (1-1023)", () => _ports.Text = PortList.WellKnown),
+                MenuItem("All TCP ports (1-65535, slow)", () => _ports.Text = PortList.AllTcp),
+                new Separator(),
+                MenuItem("No port scan", () => _ports.Text = null),
+            },
+        };
+        ToolTip.SetTip(_ports, "Ports to check on every live device. Ranges and UDP allowed: 22, 80, 8000-8100, UDP: 53, 161");
+        var portsRow = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,Auto,Auto,*,Auto"), Margin = new Thickness(14, 0, 14, 8) };
+        Control[] portControls = [new TextBlock { Text = "Ports", FontWeight = FontWeight.Bold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) }, _ports, presets, new Control(), _search];
+        presets.Margin = new Thickness(8, 0, 0, 0);
+        for (var i = 0; i < portControls.Length; i++) { Grid.SetColumn(portControls[i], i); portsRow.Children.Add(portControls[i]); }
+        foreach (var c in new Control[] { _showAlive, _showDead, _showUnknown, _favoritesOnly })
         {
             c.Margin = new Thickness(0, 0, 18, 4);
             filters.Children.Add(c);
@@ -189,8 +207,10 @@ public sealed class ScannerView : UserControl
 
         var root = new DockPanel();
         DockPanel.SetDock(toolbar, Dock.Top);
+        DockPanel.SetDock(portsRow, Dock.Top);
         DockPanel.SetDock(filters, Dock.Top);
         root.Children.Add(toolbar);
+        root.Children.Add(portsRow);
         root.Children.Add(filters);
         var statusBorder = new Border { BorderBrush = Palette.Rule, BorderThickness = new Thickness(0, 1, 0, 0), Child = statusBar };
         DockPanel.SetDock(statusBorder, Dock.Bottom);
@@ -247,6 +267,9 @@ public sealed class ScannerView : UserControl
 
     public HostResult? Selected => _list.SelectedItem as HostResult;
 
+    /// <summary>Ports to scan on every live device; empty means no port scan.</summary>
+    public string PortsText { get => _ports.Text ?? ""; set => _ports.Text = value; }
+
     /// <summary>Off by default: listing shares makes Windows sign in to each device as the current user.</summary>
     public bool ListShares { get => _listShares.IsChecked == true; set => _listShares.IsChecked = value; }
 
@@ -271,6 +294,10 @@ public sealed class ScannerView : UserControl
             return;
         }
 
+        var portParse = PortListParser.Parse(PortsText);
+        if (portParse.Errors.Count > 0) { ShowError("Ports: " + string.Join("; ", portParse.Errors)); return; }
+        var ports = portParse.Ports;
+
         _results.Clear();
         _raw.Clear();
         _visible.Clear();
@@ -285,7 +312,7 @@ public sealed class ScannerView : UserControl
         UpdateStatus();
         ShowDetails();
 
-        var options = new ScanOptions { Speed = _speed.SelectedIndex == 1 ? ScanSpeed.Accurate : ScanSpeed.Fast, ListShares = ListShares };
+        var options = new ScanOptions { Speed = _speed.SelectedIndex == 1 ? ScanSpeed.Accurate : ScanSpeed.Fast, ListShares = ListShares, Ports = ports };
         var stopped = false;
         string? failure = null;
         try
@@ -364,8 +391,22 @@ public sealed class ScannerView : UserControl
         var added = false;
         while (_incoming.TryDequeue(out var host))
         {
+            var isUpdate = _raw.ContainsKey(host.Address); // second report of a host: now with its open ports
             _raw[host.Address] = host;
             host = _store.Apply(host, _vendorDb);
+            if (isUpdate)
+            {
+                var old = _results.FindIndex(r => r.Address.Equals(host.Address));
+                if (old >= 0)
+                {
+                    var shown = _visible.IndexOf(_results[old]);
+                    var wasSelected = Selected is { } s && s.Address.Equals(host.Address);
+                    _results[old] = host;
+                    if (shown >= 0) _visible[shown] = host;
+                    if (wasSelected) { _list.SelectedItem = host; ShowDetails(); }
+                    continue;
+                }
+            }
             _results.Add(host);
             if (Matches(host)) { InsertSorted(host); added = true; }
         }
@@ -403,7 +444,7 @@ public sealed class ScannerView : UserControl
         if (_favoritesOnly.IsChecked == true && !h.IsFavorite) return false;
         var q = _search.Text?.Trim();
         if (string.IsNullOrEmpty(q)) return true;
-        return new[] { h.Name, h.Address.ToString(), h.Manufacturer, h.Mac, h.Workgroup, h.Comment, DeviceTypes.Label(h.DeviceType), ServicesText(h) }
+        return new[] { h.Name, h.Address.ToString(), h.Manufacturer, h.Mac, h.Workgroup, h.Comment, DeviceTypes.Label(h.DeviceType), SearchableServices(h) }
             .Any(v => v?.Contains(q, StringComparison.OrdinalIgnoreCase) == true);
     }
 
@@ -460,6 +501,7 @@ public sealed class ScannerView : UserControl
             var list = MenuItem("List shared folders (signs in as you)", async () => await ListSharesAsync(h));
             menu.Items.Add(list);
         }
+        menu.Items.Add(MenuItem(h.OpenPorts.Count > 0 ? "Scan ports again" : "Scan ports", async () => await ScanPortsAsync(h)));
         var more = new MenuItem { Header = "All tools" };
         foreach (var action in Enum.GetValues<HostAction>()) more.Items.Add(MenuItem(HostActions.Label(action), () => RunAction(action, h)));
         menu.Items.Add(more);
@@ -490,6 +532,44 @@ public sealed class ScannerView : UserControl
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException or ArgumentException)
         {
             ShowError($"{HostActions.Label(action)} failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>Port-scans one device with the Ports field, or the common ports when it's empty.</summary>
+    public async Task ScanPortsAsync(HostResult h)
+    {
+        var parse = PortListParser.Parse(string.IsNullOrWhiteSpace(PortsText) ? PortList.Common : PortsText);
+        if (parse.Errors.Count > 0) { ShowError("Ports: " + string.Join("; ", parse.Errors)); return; }
+        ShowInfo($"Scanning {parse.Ports.Count:N0} port(s) on {h.Address}...");
+        var options = new ScanOptions { Speed = _speed.SelectedIndex == 1 ? ScanSpeed.Accurate : ScanSpeed.Fast };
+        try
+        {
+            long checkedPorts = 0;
+            var ticker = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
+            ticker.Tick += (_, _) => ShowInfo($"Scanning ports on {h.Address}: {Interlocked.Read(ref checkedPorts):N0} of {parse.Ports.Count:N0} checked...");
+            ticker.Start();
+            IReadOnlyList<OpenPort> found;
+            try
+            {
+                // Time one ping so silent ports on a fast device don't each wait the full timeout.
+                var clock = System.Diagnostics.Stopwatch.StartNew();
+                TimeSpan? rtt = await _probes.PingAsync(h.Address, options.PingTimeout, CancellationToken.None) ? clock.Elapsed : null;
+                var timeout = options.PortTimeoutFor(h.Address, rtt);
+                found = await Task.Run(() => new PortScanner(_probes).ScanAsync(h.Address, parse.Ports, timeout,
+                    CancellationToken.None, () => Interlocked.Increment(ref checkedPorts)));
+            }
+            finally
+            {
+                ticker.Stop();
+            }
+            var raw = Raw(h) with { OpenPorts = found };
+            _raw[h.Address] = raw;
+            Replace(h, _store.Apply(raw, _vendorDb));
+            ShowInfo(found.Count == 0 ? $"No open ports found on {h.Address}." : $"{found.Count} open port(s) on {h.Address}.");
+        }
+        catch (Exception ex)
+        {
+            ShowError("Port scan failed: " + ex.Message);
         }
     }
 
@@ -694,6 +774,8 @@ public sealed class ScannerView : UserControl
         Field("Workgroup", h.Workgroup);
         Field("User", h.User);
         Field("Services", string.Join("\n", h.Services.Select(s => $"{Services.Label(s.Kind)} (port {Services.Port(s.Kind)}){(s.Detail is null ? "" : ": " + s.Detail)}")));
+        Field("Open ports", string.Join("\n", h.OpenPorts.Select(p =>
+            $"{p.Label}{(p.Service is null ? "" : " " + p.Service)}{(p.State == PortState.OpenOrFiltered ? " (open or filtered)" : "")}{(p.Detail is null ? "" : ": " + p.Detail)}")));
         Field("Shared", string.Join("\n", h.Shares.Select(s => $"{s.Name}{(s.Kind == ShareKind.Printer ? " (printer)" : "")}{(s.Remark is null ? "" : " - " + s.Remark)}")));
         Field("Comments", h.Comment);
         Field("Scanned", h.ScannedAt.ToLocalTime().ToString("g"));
@@ -720,7 +802,15 @@ public sealed class ScannerView : UserControl
         return item;
     }
 
-    private static string ServicesText(HostResult h) => string.Join(", ", h.Services.Select(s => Services.Label(s.Kind)));
+    /// <summary>Table text: open port numbers when a port scan ran (answered ports only), else the service names.</summary>
+    private static string ServicesText(HostResult h) => h.OpenPorts.Any(p => p.Confirmed)
+        ? string.Join(", ", h.OpenPorts.Where(p => p.Confirmed).Select(p => p.Protocol == PortProtocol.Tcp ? p.Port.ToString() : p.Label))
+        : string.Join(", ", h.Services.Select(s => Services.Label(s.Kind)));
+
+    /// <summary>Everything search should find: service names, port numbers and what runs on them.</summary>
+    private static string SearchableServices(HostResult h) =>
+        string.Join(" ", h.Services.Select(s => Services.Label(s.Kind))
+            .Concat(h.OpenPorts.Select(p => $"{p.Label} {p.Service} {p.Detail}")));
 
     private void UpdateStatus(string? state = null)
     {
@@ -733,7 +823,8 @@ public sealed class ScannerView : UserControl
         state ??= _cts is null ? _idleState : _gate?.IsPaused == true ? "Paused" : "Scanning...";
         _status.Text = p is null
             ? state
-            : $"{state}  {p.Percent:0}%  |  {p.Alive} alive, {p.Dead} dead, {p.Unknown} unknown  |  {p.Done:N0} of {p.Total:N0} addresses  |  showing {_visible.Count:N0}";
+            : $"{state}  {p.Percent:0}%  |  {p.Alive} alive, {p.Dead} dead, {p.Unknown} unknown  |  {p.Done:N0} of {p.Total:N0} addresses" +
+              (p.PortsChecked > 0 ? $"  |  {p.PortsChecked:N0} ports checked" : "") + $"  |  showing {_visible.Count:N0}";
     }
 
     private void ShowInfo(string message)

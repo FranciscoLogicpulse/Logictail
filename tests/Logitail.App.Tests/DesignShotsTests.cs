@@ -103,6 +103,7 @@ public sealed class DesignShotsTests : IDisposable
         var view = new ScannerView(new DemoNetwork(), Path.Combine(AppContext.BaseDirectory, "data", "oui.csv"), HostStore.InMemory())
         {
             RangeText = "192.168.1.1-40",
+            PortsText = "22, 80, 443, 445, 3389, 8080",
         };
         window.FindControl<ContentControl>("NetworkPage")!.Content = view;
         window.FindControl<Button>("NavNetwork")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
@@ -145,5 +146,7 @@ public sealed class DesignShotsTests : IDisposable
         public Task<string?> ServiceDetailAsync(IPAddress ip, ServiceKind s, TimeSpan t, CancellationToken ct) =>
             Task.FromResult<string?>(s switch { ServiceKind.Http when Last(ip) == 1 => "Router login", ServiceKind.Ssh => "SSH-2.0-OpenSSH_9.6", _ => null });
         public Task<IReadOnlyList<SharedResource>> SharesAsync(IPAddress ip, TimeSpan t, CancellationToken ct) => Task.FromResult<IReadOnlyList<SharedResource>>([]);
+        public Task<string?> BannerAsync(IPAddress ip, int port, TimeSpan t, CancellationToken ct) => Task.FromResult<string?>(null);
+        public Task<UdpResult> UdpProbeAsync(IPAddress ip, int port, TimeSpan t, CancellationToken ct) => Task.FromResult(UdpResult.Closed);
     }
 }

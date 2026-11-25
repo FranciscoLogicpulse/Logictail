@@ -124,6 +124,35 @@ Lines marked **(design)** are not observed in the binaries: they are Logitail de
 
 ---
 
+## Part 3 — Port scanner (from Advanced Port Scanner)
+
+Studied statically with REA: `Advanced_Port_Scanner_2.5.3869.exe` from the official site (Famatech signature valid,
+SHA-256 `d0c1662c…`), unpacked with 7-Zip, `advanced_port_scanner.exe` (`8b9c7d25…`, 4,942 strings, compared against
+the IP Scanner's to isolate what's new) and the console exe's help. Not run.
+
+### 3.1 Observed
+- Port list input mixing single ports, ranges and protocols: `80, 443, UDP: 1-10`, `1,2,UDP:1-10`, `1-20`.
+  Invalid input is rejected ("Invalid port range").
+- Presets: well-known TCP ports `1-1023`, all TCP ports `1-65535`.
+- Remembers recently used port lists.
+- Results per host: open port, protocol (TCP or UDP), service name and the version of the program on the port.
+- Same host discovery, favorites, comments, export (XML/HTML/CSV), print and Radmin extras as Advanced IP Scanner.
+- Console mode: `/r:<range>` or `/s:<file>`, `/p:<ports>`, `/f:<output file>`.
+- Service versions come from a compressed probe database (`service_probes`); its format wasn't decoded.
+
+### 3.2 Logitail design
+- Part of the Network screen, not a separate tool: an optional **Ports** field next to From/To. Empty means no port
+  scan (only the built-in service checks). Filled, every live host is also port-scanned.
+- **(design)** Presets menu: common ports (Logitail's own list of ~40), well-known (1-1023), all (1-65535).
+- **(design)** Same syntax as the original, plus `TCP:` to switch back. Max 65,535 ports per protocol.
+- **(design)** Right-click a device: "Scan ports..." for that one device.
+- **(design)** Service names from a hand-written table of well-known ports; versions from the first line the
+  service sends (banner), or the page title for web ports. No probe database is copied.
+- **(design)** UDP: a port is "open" only if it answers, "closed" if the host reports it unreachable, otherwise
+  "open or filtered". Real probes only for DNS (53), NTP (123) and NetBIOS (137); others get an empty datagram.
+- **(design)** A shared limit on connections in flight so a big scan can't exhaust the PC's sockets.
+- Results: an "Open ports" column, a list in the details pane, and in exports.
+
 ## Architecture
 
 - **.NET 10**, **Avalonia** UI (cross-platform capable; Windows is the target).

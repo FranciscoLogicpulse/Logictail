@@ -21,13 +21,39 @@ public sealed record ScanOptions
     /// with the current user's credentials to list them.
     /// </summary>
     public bool ListShares { get; init; }
+    /// <summary>Extra ports to check on every live host. Empty: no port scan.</summary>
+    public PortList Ports { get; init; } = PortList.Empty;
 
     public TimeSpan PingTimeout => Speed == ScanSpeed.Fast ? TimeSpan.FromMilliseconds(600) : TimeSpan.FromMilliseconds(1500);
     public TimeSpan PortTimeout => Speed == ScanSpeed.Fast ? TimeSpan.FromMilliseconds(500) : TimeSpan.FromMilliseconds(1500);
     public TimeSpan LookupTimeout => TimeSpan.FromMilliseconds(1500);
+
+    /// <summary>
+    /// Port-check timeout for one address. Devices on this PC's own subnet answer in milliseconds, so a closed or
+    /// filtered port there doesn't need the long wait that remote addresses do.
+    /// </summary>
+    public TimeSpan PortTimeoutFor(IPAddress ip) =>
+        IsLocal(ip) ? (Speed == ScanSpeed.Fast ? TimeSpan.FromMilliseconds(200) : TimeSpan.FromMilliseconds(500)) : PortTimeout;
+
+    /// <summary>
+    /// Port-check timeout from the device's measured ping time: 4x the round trip plus 30 ms, between 50 ms and the
+    /// normal timeout. A device that answers ping in 1 ms doesn't need 200 ms to show a port is silent.
+    /// </summary>
+    public TimeSpan PortTimeoutFor(IPAddress ip, TimeSpan? pingRoundTrip)
+    {
+        var normal = PortTimeoutFor(ip);
+        if (pingRoundTrip is not { } rtt) return normal;
+        var adaptive = TimeSpan.FromMilliseconds(rtt.TotalMilliseconds * 4 + 30);
+        return adaptive < MinPortTimeout ? MinPortTimeout : adaptive > normal ? normal : adaptive;
+    }
+
+    public static readonly TimeSpan MinPortTimeout = TimeSpan.FromMilliseconds(50);
+
+    /// <summary>Decides "local subnet". Replaceable for tests.</summary>
+    public Func<IPAddress, bool> IsLocal { get; init; } = LocalNetwork.IsLocal;
 }
 
-public sealed record ScanProgress(int Done, int Total, int Alive, int Dead, int Unknown)
+public sealed record ScanProgress(int Done, int Total, int Alive, int Dead, int Unknown, long PortsChecked = 0)
 {
     public double Percent => Total == 0 ? 100 : Done * 100.0 / Total;
 }
@@ -66,6 +92,9 @@ public sealed class PauseGate
 /// <summary>Scans addresses in parallel and reports each host as soon as it is done.</summary>
 public sealed class ScanEngine(IProbes probes, OuiDatabase vendors)
 {
+    private readonly PortScanner _ports = new(probes);
+    private long _portsChecked;
+
     /// <summary>
     /// Resolves host names, then scans every address. <paramref name="onResult"/> and <paramref name="onProgress"/>
     /// are called from worker threads. Cancelling stops new work; hosts already finished stay reported.
@@ -87,14 +116,20 @@ public sealed class ScanEngine(IProbes probes, OuiDatabase vendors)
         }
 
         int done = 0, alive = 0, dead = 0, unknown = 0;
-        onProgress?.Invoke(new ScanProgress(0, addresses.Count, 0, 0, 0));
+        Interlocked.Exchange(ref _portsChecked, 0);
+        ScanProgress Progress() => new(Volatile.Read(ref done), addresses.Count, Volatile.Read(ref alive), Volatile.Read(ref dead),
+            Volatile.Read(ref unknown), Interlocked.Read(ref _portsChecked));
+        onProgress?.Invoke(Progress());
+        // Port progress: report every 250 ports so the UI moves during long port scans.
+        void PortDone() { if (Interlocked.Increment(ref _portsChecked) % 250 == 0) onProgress?.Invoke(Progress()); }
 
         await Parallel.ForEachAsync(addresses,
             new ParallelOptions { MaxDegreeOfParallelism = Math.Max(1, options.Threads), CancellationToken = ct },
             async (ip, token) =>
             {
                 if (pause is not null) await pause.WaitAsync(token);
-                var result = await ScanHostAsync(ip, options, token);
+                // A live host is reported right away, then again with its open ports once the port scan ends.
+                var result = await ScanHostAsync(ip, options, token, onResult, PortDone);
                 onResult(result);
                 _ = result.Status switch
                 {
@@ -102,17 +137,18 @@ public sealed class ScanEngine(IProbes probes, OuiDatabase vendors)
                     HostStatus.Dead => Interlocked.Increment(ref dead),
                     _ => Interlocked.Increment(ref unknown),
                 };
-                var d = Interlocked.Increment(ref done);
-                onProgress?.Invoke(new ScanProgress(d, addresses.Count, Volatile.Read(ref alive), Volatile.Read(ref dead), Volatile.Read(ref unknown)));
+                Interlocked.Increment(ref done);
+                onProgress?.Invoke(Progress());
             });
     }
 
     /// <summary>Scans one address. A probe that fails unexpectedly makes the host Unknown instead of ending the scan.</summary>
-    public async Task<HostResult> ScanHostAsync(IPAddress ip, ScanOptions options, CancellationToken ct)
+    public async Task<HostResult> ScanHostAsync(IPAddress ip, ScanOptions options, CancellationToken ct,
+        Action<HostResult>? onPartial = null, Action? onPortChecked = null)
     {
         try
         {
-            return await ScanHostCoreAsync(ip, options, ct);
+            return await ScanHostCoreAsync(ip, options, ct, onPartial, onPortChecked);
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
@@ -120,13 +156,17 @@ public sealed class ScanEngine(IProbes probes, OuiDatabase vendors)
         }
     }
 
-    private async Task<HostResult> ScanHostCoreAsync(IPAddress ip, ScanOptions options, CancellationToken ct)
+    private async Task<HostResult> ScanHostCoreAsync(IPAddress ip, ScanOptions options, CancellationToken ct,
+        Action<HostResult>? onPartial, Action? onPortChecked)
     {
         bool pinged;
         string? arpMac;
+        TimeSpan rtt = default;
         try
         {
-            var ping = probes.PingAsync(ip, options.PingTimeout, ct);
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            var ping = probes.PingAsync(ip, options.PingTimeout, ct)
+                .ContinueWith(t => { rtt = clock.Elapsed; return t; }, TaskScheduler.Default).Unwrap();
             var arp = probes.ArpAsync(ip, ct);
             await Task.WhenAll(ping, arp);
             pinged = ping.Result;
@@ -168,14 +208,19 @@ public sealed class ScanEngine(IProbes probes, OuiDatabase vendors)
             Services = services,
             Shares = shares.Result,
         };
-        return host with { DeviceType = DeviceTypes.Guess(host) };
+        host = host with { DeviceType = DeviceTypes.Guess(host) };
+        if (options.Ports.IsEmpty) return host;
+
+        onPartial?.Invoke(host); // show the device now; ports follow
+        var openPorts = await _ports.ScanAsync(ip, options.Ports, options.PortTimeoutFor(ip, pinged ? rtt : null), ct, onPortChecked);
+        return host with { OpenPorts = openPorts };
     }
 
     private async Task<List<FoundService>> ServicesAsync(IPAddress ip, ScanOptions options, CancellationToken ct)
     {
         var checks = Services.All.Select(async kind =>
         {
-            if (!await probes.TcpOpenAsync(ip, Services.Port(kind), options.PortTimeout, ct)) return null;
+            if (!await probes.TcpOpenAsync(ip, Services.Port(kind), options.PortTimeoutFor(ip), ct)) return null;
             var detail = await probes.ServiceDetailAsync(ip, kind, options.LookupTimeout, ct);
             return new FoundService(kind, detail);
         });

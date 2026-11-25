@@ -66,7 +66,7 @@ public sealed class ProbeTests
     public async Task Reads_a_service_banner()
     {
         var (port, server) = await Serve("SSH-2.0-OpenSSH_9.6\r\nignored second line\r\n", false);
-        Assert.Equal("SSH-2.0-OpenSSH_9.6", await SystemProbes.BannerAsync(IPAddress.Loopback, port, TimeSpan.FromSeconds(5), CancellationToken.None));
+        Assert.Equal("SSH-2.0-OpenSSH_9.6", await SystemProbes.ReadBannerAsync(IPAddress.Loopback, port, TimeSpan.FromSeconds(5), CancellationToken.None));
         await server;
     }
 
@@ -107,6 +107,8 @@ public sealed class ScanEngineFailureTests
         public Task<bool> TcpOpenAsync(IPAddress ip, int port, TimeSpan t, CancellationToken ct) { Maybe(ip, "tcp", ct); return Task.FromResult(port == 80); }
         public Task<string?> ServiceDetailAsync(IPAddress ip, ServiceKind s, TimeSpan t, CancellationToken ct) { Maybe(ip, "detail", ct); return Task.FromResult<string?>("ok"); }
         public Task<IReadOnlyList<SharedResource>> SharesAsync(IPAddress ip, TimeSpan t, CancellationToken ct) => Task.FromResult<IReadOnlyList<SharedResource>>([]);
+        public Task<string?> BannerAsync(IPAddress ip, int port, TimeSpan t, CancellationToken ct) => Task.FromResult<string?>(null);
+        public Task<UdpResult> UdpProbeAsync(IPAddress ip, int port, TimeSpan t, CancellationToken ct) => Task.FromResult(UdpResult.Closed);
     }
 
     private static int Last(IPAddress ip) => ip.GetAddressBytes()[3];

@@ -55,6 +55,8 @@ public sealed record HostResult
     /// <summary>Shared folders and printers (SMB), without hidden admin shares.</summary>
     public IReadOnlyList<SharedResource> Shares { get; init; } = [];
     public DeviceType DeviceType { get; init; }
+    /// <summary>Open ports from a port scan (empty when no ports were asked for).</summary>
+    public IReadOnlyList<OpenPort> OpenPorts { get; init; } = [];
 
     // From the user's notes (HostStore), not the network.
     public string? Comment { get; init; }

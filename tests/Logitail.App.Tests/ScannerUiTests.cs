@@ -30,6 +30,8 @@ public sealed class ScannerUiTests
             Task.FromResult(s == ServiceKind.Http ? "Router admin" : null);
         public Task<IReadOnlyList<SharedResource>> SharesAsync(IPAddress ip, TimeSpan t, CancellationToken ct) =>
             Task.FromResult<IReadOnlyList<SharedResource>>(Last(ip) == 2 ? [new SharedResource("Media", ShareKind.Folder, "Movies"), new SharedResource("Laser", ShareKind.Printer, null)] : []);
+        public Task<string?> BannerAsync(IPAddress ip, int port, TimeSpan t, CancellationToken ct) => Task.FromResult<string?>(null);
+        public Task<UdpResult> UdpProbeAsync(IPAddress ip, int port, TimeSpan t, CancellationToken ct) => Task.FromResult(UdpResult.Closed);
     }
 
     private static void Pump()
@@ -165,6 +167,47 @@ public sealed class ScannerUiTests
         public Task<bool> TcpOpenAsync(IPAddress ip, int port, TimeSpan t, CancellationToken ct) => Task.FromResult(false);
         public Task<string?> ServiceDetailAsync(IPAddress ip, ServiceKind s, TimeSpan t, CancellationToken ct) => Task.FromResult<string?>(null);
         public Task<IReadOnlyList<SharedResource>> SharesAsync(IPAddress ip, TimeSpan t, CancellationToken ct) => Task.FromResult<IReadOnlyList<SharedResource>>([]);
+        public Task<string?> BannerAsync(IPAddress ip, int port, TimeSpan t, CancellationToken ct) => Task.FromResult<string?>(null);
+        public Task<UdpResult> UdpProbeAsync(IPAddress ip, int port, TimeSpan t, CancellationToken ct) => Task.FromResult(UdpResult.Closed);
+    }
+
+    [AvaloniaFact]
+    public async Task Port_scan_from_the_ports_field_and_right_click()
+    {
+        var view = new ScannerView(new PortProbes(), VendorFile, HostStore.InMemory()) { RangeText = "10.0.0.1", PortsText = "20-25, UDP: 53" };
+        var window = new Window { Width = 1100, Height = 420, Content = view };
+        window.Show();
+        await view.ToggleScanAsync();
+        Pump();
+        var host = view.VisibleResults.Single();
+        Assert.Equal(["22/tcp", "53/udp"], host.OpenPorts.Select(p => p.Label));
+
+        // Bad port list: no scan, clear error.
+        view.PortsText = "22, 99999";
+        await view.ToggleScanAsync();
+        Pump();
+        Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text?.StartsWith("Ports:") == true);
+
+        // Right-click scan on one device with an empty field uses the common ports.
+        view.PortsText = "";
+        await view.ScanPortsAsync(view.VisibleResults.Single());
+        Pump();
+        Assert.Contains(view.VisibleResults.Single().OpenPorts, p => p.Port == 3389);
+        window.Close();
+    }
+
+    /// <summary>Ping-alive host with TCP 22 and 3389 open and UDP 53 answering.</summary>
+    private sealed class PortProbes : IProbes
+    {
+        public Task<bool> PingAsync(IPAddress ip, TimeSpan t, CancellationToken ct) => Task.FromResult(true);
+        public Task<string?> ArpAsync(IPAddress ip, CancellationToken ct) => Task.FromResult<string?>(null);
+        public Task<string?> ReverseDnsAsync(IPAddress ip, TimeSpan t, CancellationToken ct) => Task.FromResult<string?>("server");
+        public Task<NetBiosInfo?> NetBiosAsync(IPAddress ip, TimeSpan t, CancellationToken ct) => Task.FromResult<NetBiosInfo?>(null);
+        public Task<bool> TcpOpenAsync(IPAddress ip, int port, TimeSpan t, CancellationToken ct) => Task.FromResult(port is 22 or 3389);
+        public Task<string?> ServiceDetailAsync(IPAddress ip, ServiceKind s, TimeSpan t, CancellationToken ct) => Task.FromResult<string?>(null);
+        public Task<IReadOnlyList<SharedResource>> SharesAsync(IPAddress ip, TimeSpan t, CancellationToken ct) => Task.FromResult<IReadOnlyList<SharedResource>>([]);
+        public Task<string?> BannerAsync(IPAddress ip, int port, TimeSpan t, CancellationToken ct) => Task.FromResult<string?>(port == 22 ? "SSH-2.0-OpenSSH_9.6" : null);
+        public Task<UdpResult> UdpProbeAsync(IPAddress ip, int port, TimeSpan t, CancellationToken ct) => Task.FromResult(port == 53 ? UdpResult.Open : UdpResult.Closed);
     }
 
     [AvaloniaFact]
@@ -213,13 +256,18 @@ public sealed class ScannerUiTests
     {
         if (Environment.GetEnvironmentVariable("LOGITAIL_LIVE") != "1") return;
         var own = LocalNetwork.Subnets().Select(s => s.Address.ToString()).Prepend("127.0.0.1").ToList();
-        var (window, view) = await Open(new SystemProbes(), string.Join(", ", own));
+        var view0 = new ScannerView(new SystemProbes(), VendorFile, HostStore.InMemory()) { RangeText = string.Join(", ", own), PortsText = PortList.Common + ", UDP: 53, 123, 137" };
+        var window = new Window { Width = 1100, Height = 420, Content = view0 };
+        window.Show();
+        await view0.ToggleScanAsync();
+        Pump();
+        var view = view0;
         Assert.Equal(own.Count, view.Results.Count);
         Assert.All(view.Results, h => Assert.Equal(HostStatus.Alive, h.Status));
         window.CaptureRenderedFrame()?.Save(Path.Combine(ShotDir, "logitail-scanner-live.png"));
         File.WriteAllLines(Path.Combine(ShotDir, "logitail-scanner-live.txt"), view.Results.Select(h =>
             $"{h.Address} | {h.Status} | name={h.Name} | type={h.DeviceType} | mac={h.Mac} | vendor={h.Manufacturer} | shares={string.Join("+", h.Shares.Select(s => s.Name))} | " +
-            string.Join(", ", h.Services.Select(s => $"{s.Kind}:{s.Detail}"))));
+            string.Join(", ", h.Services.Select(s => $"{s.Kind}:{s.Detail}")) + " | ports: " + string.Join(", ", h.OpenPorts.Select(p => $"{p.Label}={p.State}:{p.Detail}"))));
         window.Close();
     }
 }

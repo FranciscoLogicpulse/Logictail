@@ -20,6 +20,10 @@ public interface IProbes
     Task<string?> ServiceDetailAsync(IPAddress ip, ServiceKind service, TimeSpan timeout, CancellationToken ct);
     /// <summary>Shared folders and printers on a host with SMB open.</summary>
     Task<IReadOnlyList<SharedResource>> SharesAsync(IPAddress ip, TimeSpan timeout, CancellationToken ct);
+    /// <summary>What runs on an open TCP port: page title for web ports, else the service's first line. Null if silent.</summary>
+    Task<string?> BannerAsync(IPAddress ip, int port, TimeSpan timeout, CancellationToken ct);
+    /// <summary>Whether a UDP port answers, is reported closed, or stays silent.</summary>
+    Task<UdpResult> UdpProbeAsync(IPAddress ip, int port, TimeSpan timeout, CancellationToken ct);
 }
 
 /// <summary>Real probes using the OS network stack.</summary>
@@ -126,7 +130,7 @@ public sealed partial class SystemProbes : IProbes
                 ServiceKind.Http => await HttpTitleAsync($"http://{ip}/", timeout, ct),
                 ServiceKind.Http8080 => await HttpTitleAsync($"http://{ip}:8080/", timeout, ct),
                 ServiceKind.Https => await HttpTitleAsync($"https://{ip}/", timeout, ct),
-                ServiceKind.Ftp or ServiceKind.Ssh => await BannerAsync(ip, Services.Port(service), timeout, ct),
+                ServiceKind.Ftp or ServiceKind.Ssh => await ReadBannerAsync(ip, Services.Port(service), timeout, ct),
                 _ => null,
             };
         }
@@ -136,6 +140,57 @@ public sealed partial class SystemProbes : IProbes
             return null;
         }
     }
+
+    public async Task<string?> BannerAsync(IPAddress ip, int port, TimeSpan timeout, CancellationToken ct)
+    {
+        try
+        {
+            if (PortNames.IsHttps(port)) return await HttpTitleAsync($"https://{ip}:{port}/", timeout, ct);
+            if (PortNames.IsHttp(port)) return await HttpTitleAsync($"http://{ip}:{port}/", timeout, ct);
+            return await ReadBannerAsync(ip, port, timeout, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            return null; // silent or not a protocol we read: just "open"
+        }
+    }
+
+    public async Task<UdpResult> UdpProbeAsync(IPAddress ip, int port, TimeSpan timeout, CancellationToken ct)
+    {
+        using var udp = new UdpClient(AddressFamily.InterNetwork);
+        try
+        {
+            udp.Connect(ip, port); // connected socket: Windows reports ICMP "port unreachable" as a reset
+            await udp.SendAsync(UdpPayload(port), ct);
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(timeout);
+            await udp.ReceiveAsync(cts.Token);
+            return UdpResult.Open;
+        }
+        catch (SocketException ex) when (ex.SocketErrorCode == SocketError.ConnectionReset)
+        {
+            return UdpResult.Closed;
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            return UdpResult.OpenOrFiltered;
+        }
+        catch (SocketException)
+        {
+            return UdpResult.OpenOrFiltered;
+        }
+    }
+
+    /// <summary>A request the service would answer: DNS, NTP and NetBIOS get real queries, others an empty datagram.</summary>
+    public static byte[] UdpPayload(int port) => port switch
+    {
+        // DNS: standard query, one question: root zone, type NS, class IN.
+        53 => [0x13, 0x37, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x01],
+        // NTP: version 3 client request.
+        123 => [0x1B, .. new byte[47]],
+        137 => NetBios.BuildQuery(0x1337),
+        _ => [],
+    };
 
     public async Task<IReadOnlyList<SharedResource>> SharesAsync(IPAddress ip, TimeSpan timeout, CancellationToken ct)
     {
@@ -169,7 +224,7 @@ public sealed partial class SystemProbes : IProbes
     private static string Shorten(string text) => text.Length > 120 ? text[..120] + "…" : text;
 
     /// <summary>Reads the first line a service sends on connect (FTP and SSH greet first).</summary>
-    public static async Task<string?> BannerAsync(IPAddress ip, int port, TimeSpan timeout, CancellationToken ct)
+    public static async Task<string?> ReadBannerAsync(IPAddress ip, int port, TimeSpan timeout, CancellationToken ct)
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(timeout);

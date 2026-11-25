@@ -7,13 +7,15 @@ namespace Logitail.Scanner;
 public static class Export
 {
     private static readonly string[] Headers =
-        ["Status", "Name", "IP", "Manufacturer", "MAC address", "Type", "NetBIOS name", "Workgroup", "Services", "Shares", "Comments"];
+        ["Status", "Name", "IP", "Manufacturer", "MAC address", "Type", "NetBIOS name", "Workgroup", "Services", "Open ports", "Shares", "Comments"];
 
     private static string[] Fields(HostResult h) =>
     [
         h.Status.ToString(), h.Name ?? "", h.Address.ToString(), h.Manufacturer ?? "", h.Mac ?? "",
         DeviceTypes.Label(h.DeviceType), h.NetBiosName ?? "", h.Workgroup ?? "",
         string.Join("; ", h.Services.Select(s => s.Detail is null ? Services.Label(s.Kind) : $"{Services.Label(s.Kind)} ({s.Detail})")),
+        // Only ports that answered; silent UDP ports are "maybe" and would list every port behind a firewall.
+        string.Join("; ", h.OpenPorts.Where(p => p.Confirmed).Select(p => p.Detail is null ? p.Label : $"{p.Label} ({p.Detail})")),
         string.Join("; ", h.Shares.Select(s => s.Name)),
         h.Comment ?? "",
     ];
