@@ -175,11 +175,6 @@ public partial class MainWindow : Window
         Current?.View.Focus();
     }
 
-    private void OnFollowToggle(object? sender, RoutedEventArgs e)
-    {
-        if (Current is { } tab) tab.View.FollowTail = FollowToggle.IsChecked == true;
-        UpdateChrome();
-    }
 
     // --- settings ---
 
@@ -292,7 +287,6 @@ public partial class MainWindow : Window
     {
         EmptyLogs.IsVisible = _tabs.Count == 0;
         Tabs.IsVisible = _tabs.Count > 0;
-        FollowToggle.IsVisible = LogsPage.IsVisible && Current is not null;
         if (Current is not { } tab)
         {
             TailButton.IsVisible = false;
@@ -301,21 +295,21 @@ public partial class MainWindow : Window
             FollowTailItem.IsChecked = false;
             return;
         }
-        FollowToggle.IsChecked = tab.View.FollowTail;
         TailButton.IsVisible = true;
-        TailText.Text = tab.View.FollowTail ? "Pause" : "Follow tail";
+        TailText.Text = tab.View.FollowTail ? "Following" : "Follow tail";
+        ToolTip.SetTip(TailButton, tab.View.FollowTail ? "Following new lines. Click to pause (Ctrl+T)" : "Paused. Click to jump to the end and follow (Ctrl+T)");
         TailIcon.Data = Avalonia.Media.Geometry.Parse(tab.View.FollowTail
-            ? "M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"                               // pause bars
+            ? "M12 7a5 5 0 1 1 0 10a5 5 0 1 1 0-10z"                          // live dot
             : "M11 4h2v12.2l4.6-4.6 1.4 1.4-7 7-7-7 1.4-1.4 4.6 4.6z");        // arrow to the end
         TailButton.Classes.Set("primary", !tab.View.FollowTail);
-        FollowToggle.Content = tab.View.FollowTail ? "Following" : "Paused";
+        if (tab.View.FollowTail) TailIcon.Foreground = Palette.Green; else TailIcon.ClearValue(PathIcon.ForegroundProperty); // green = live
         var f = tab.File;
         Title = $"{f.Name} - Logictail";
         var indexing = f.IsFullyIndexed ? "" : "  |  indexing...";
         var selection = tab.View.Selection is var (a, b) ? $"  |  selected {b - a + 1:N0} line(s)" : "";
         StatusText.Text = f.Error is { } err
             ? $"{f.Path}  |  {err}"
-            : $"{(tab.View.FollowTail ? "Following" : "Paused")}  |  {f.LineCount:N0} lines  |  {LogTab.FormatSize(f.Length)}  |  " +
+            : $"{f.LineCount:N0} lines  |  {LogTab.FormatSize(f.Length)}  |  " +
               $"{f.Encoding.DisplayName()}{selection}{indexing}  |  {f.Path}";
         FollowTailItem.IsChecked = tab.View.FollowTail;
         foreach (var item in EncodingMenu.Items.OfType<MenuItem>())

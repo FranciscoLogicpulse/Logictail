@@ -78,11 +78,11 @@ public sealed class DesignShotsTests : IDisposable
         Assert.True(strip.IsVisible); // two files: small tabs on top
         var badges = window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToList();
         Assert.Contains("+12", badges);
-        // Tail button sits on the log: "Pause" while following, teal "Follow tail" when paused.
+        // Tail button sits on the log: "Following" while following, teal "Follow tail" when paused.
         var tail = window.FindControl<Button>("TailButton")!;
         var tailText = window.FindControl<TextBlock>("TailText")!;
         Assert.True(tail.IsVisible);
-        Assert.Equal("Pause", tailText.Text);
+        Assert.Equal("Following", tailText.Text);
         tail.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         Pump();
         Assert.Equal("Follow tail", tailText.Text);
@@ -90,7 +90,7 @@ public sealed class DesignShotsTests : IDisposable
         window.CaptureRenderedFrame()?.Save(Path.Combine(ShotDir, "design-logs.png"));
         tail.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         Pump();
-        Assert.Equal("Pause", tailText.Text);
+        Assert.Equal("Following", tailText.Text);
 
         // Collapse the sidebar to its rail.
         window.FindControl<Button>("SidebarToggle")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
