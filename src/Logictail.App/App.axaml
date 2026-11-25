@@ -2,7 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="Logictail.App.App"
              RequestedThemeVariant="Light">
-  <!-- Tokens: see docs/DESIGN.md. Colors follow LogicERP's portal CSS. -->
+  <!-- Tokens: see docs/DESIGN.md. -->
   <Application.Resources>
     <!-- Fluent sizes tab headers from this resource, not from FontSize. -->
     <x:Double x:Key="TabItemHeaderFontSize">12</x:Double>
@@ -39,7 +39,7 @@
       <Setter Property="CornerRadius" Value="4" />
     </Style>
 
-    <!-- Secondary buttons: outlined, like LogicERP's Bootstrap buttons, not filled grey blocks. -->
+    <!-- Secondary buttons: outlined, with thin borders, not filled grey blocks. -->
     <Style Selector="Button:not(.primary):not(.quiet):not(.nav)">
       <Setter Property="Background" Value="{StaticResource Paper}" />
       <Setter Property="BorderBrush" Value="{StaticResource Rule}" />

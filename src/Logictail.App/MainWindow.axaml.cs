@@ -153,7 +153,7 @@ public partial class MainWindow : Window
 
     private bool _sidebarSetByUser;
 
-    /// <summary>Folds the sidebar to a 50 px icon rail, as LogicERP does.</summary>
+    /// <summary>Folds the sidebar to a 50 px icon rail.</summary>
     private void OnToggleSidebar(object? sender, RoutedEventArgs e)
     {
         _sidebarSetByUser = true;

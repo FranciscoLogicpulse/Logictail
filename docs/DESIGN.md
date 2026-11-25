@@ -1,27 +1,27 @@
 # Logictail design
 
-Brief: resemble LogicERP (the owner's company web app), sidebar navigation, teal accent.
+Brief: a light, calm business-app look, sidebar navigation, teal accent.
 Subject: a desk tool someone keeps open all day beside other work, watching logs scroll and occasionally
 checking what's on the network. Primary job: make new log lines and their severity readable at a glance.
 
 ## Tokens
 
-Taken from LogicERP's portal CSS where it defines them; the rest chosen to sit with them.
+A small, muted palette chosen to sit together.
 
 | Name | Hex | Use | Source |
 |---|---|---|---|
-| Steel teal | `#67929E` | accent: active nav, primary button, selection, focus | LogicERP `--portal-brand-primary` |
-| Teal light | `#9BB5BC` | wrap markers, disabled accent, progress track | LogicERP `--color-sf-primary-light` |
-| Teal mist | `#E8EEF0` | hover and selected rows, active sidebar item fill | LogicERP `--color-sf-primary-lighter` |
-| Paper | `#FFFFFF` | header, sidebar, panels | LogicERP header/sidebar |
+| Steel teal | `#67929E` | accent: active nav, primary button, selection, focus |
+| Teal light | `#9BB5BC` | wrap markers, disabled accent, progress track |
+| Teal mist | `#E8EEF0` | hover and selected rows, active sidebar item fill |
+| Paper | `#FFFFFF` | header, sidebar, panels |
 | Canvas | `#F3F5F6` | app background behind the panel | chosen: one step off white so the panel reads as a sheet |
-| Charcoal | `#323537` | text | LogicERP login background (avoids a generic #111) |
+| Charcoal | `#323537` | text |
 | Slate | `#6C7A7F` | secondary text, column headers | chosen, teal-greyed to match |
-| Rule | `#DEE2E6` | borders and dividers | LogicERP borders |
+| Rule | `#DEE2E6` | borders and dividers |
 
-Status colors are LogicERP's: green `#93C949`, orange `#EA843E`, red `#E74E34`, yellow `#EFE15F`.
+Status colors: green `#93C949`, orange `#EA843E`, red `#E74E34`, yellow `#EFE15F`.
 
-Type: Montserrat (regular and bold, LogicERP's face) for the interface; Cascadia Mono for log text only,
+Type: Montserrat (regular and bold) for the interface; Cascadia Mono for log text only,
 because columns of log text must align. Scale: 12 (column headers, captions), 13 (body, tables), 15 (panel titles),
 17 (wordmark). Sentence case everywhere; no all-caps labels.
 
@@ -57,11 +57,11 @@ Left aligned throughout. The sidebar replaces the file tab strip (the strip can 
   and a second moving thing would compete with it. The pill stays as a static toggle.
 - First draft had dashboard-style summary cards above the scan table (alive / dead / unknown counts). Dropped:
   that's the SaaS card kit, and the counts already sit in the status line.
-- Kept LogicERP's soft panel shadow because the brief asks for LogicERP; limited to the single content panel.
+- Kept a soft panel shadow, limited to the single content panel.
 - Status line uses plain separators, not middle-dot meta strings.
 
 ## Assets
 
-- Montserrat font files are copied from LogicERP's portal (`wwwroot/fonts`). Montserrat is under the SIL Open
+- Montserrat font files are the upstream release. Montserrat is under the SIL Open
   Font License 1.1, (c) 2011 The Montserrat Project Authors. See `src/Logictail.App/Assets/Fonts/NOTICE.txt`.
-- No LogicERP or Logicpulse logos, images or icon files are used. Logictail's mark and sidebar icons are drawn in code.
+- No third-party logos, images or icon files are used. Logictail's mark and sidebar icons are drawn in code.

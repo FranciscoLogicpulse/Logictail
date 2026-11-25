@@ -14,7 +14,7 @@ public static class Palette
     public static readonly IBrush Slate = new SolidColorBrush(Color.Parse("#6C7A7F"));
     public static readonly IBrush Rule = new SolidColorBrush(Color.Parse("#DEE2E6"));
 
-    // LogicERP status colors.
+    // Status colors.
     public static readonly IBrush Green = new SolidColorBrush(Color.Parse("#93C949"));
     public static readonly IBrush Orange = new SolidColorBrush(Color.Parse("#EA843E"));
     public static readonly IBrush Red = new SolidColorBrush(Color.Parse("#E74E34"));

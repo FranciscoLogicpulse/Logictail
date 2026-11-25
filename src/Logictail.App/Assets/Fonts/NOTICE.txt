@@ -4,4 +4,4 @@ Copyright 2011 The Montserrat Project Authors (https://github.com/JulietaUla/Mon
 Licensed under the SIL Open Font License, Version 1.1.
 Full license text: https://openfontlicense.org/open-font-license-official-text/
 
-The font files were copied from the LogicERP portal (wwwroot/fonts), which bundles the same upstream release.
+The font files are the upstream release.

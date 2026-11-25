@@ -69,7 +69,7 @@ public sealed class AppSettings
 
     public static List<HighlightRule> DefaultRules() =>
     [
-        // Tinted rows with dark text: readable for hours, colors from LogicERP's status palette.
+        // Tinted rows with dark text: readable for hours, using the status palette.
         new() { Pattern = "error", Foreground = 0xFF8A2A1B, Background = 0xFFFBE1DC },
         new() { Pattern = "exception", Foreground = 0xFF8A2A1B, Background = 0xFFFBE1DC },
         new() { Pattern = "warn", Foreground = 0xFF7A4A12, Background = 0xFFFDEBDD },
