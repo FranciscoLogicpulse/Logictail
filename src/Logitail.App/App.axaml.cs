@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Logitail.Core.Settings;
 
 namespace Logitail.App;
 
@@ -12,9 +13,10 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            var window = new MainWindow();
-            window.OpenFiles(desktop.Args ?? []);
-            desktop.MainWindow = window;
+            var store = SettingsStore.ForCurrentUser();
+            var settings = store.Load();
+            var commandLine = CommandLine.Parse(desktop.Args ?? []);
+            desktop.MainWindow = new MainWindow(store, settings, commandLine);
         }
         base.OnFrameworkInitializationCompleted();
     }

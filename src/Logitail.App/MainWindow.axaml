@@ -4,22 +4,48 @@
         Title="Logitail" Width="1100" Height="700"
         DragDrop.AllowDrop="True">
   <DockPanel>
-    <Menu DockPanel.Dock="Top">
+    <Menu x:Name="MainMenu" DockPanel.Dock="Top">
       <MenuItem Header="_File">
         <MenuItem Header="_Open..." InputGesture="Ctrl+O" Click="OnOpen" />
+        <MenuItem x:Name="RecentMenu" Header="Open Recent _File" />
+        <Separator />
         <MenuItem Header="_Close" InputGesture="Ctrl+W" Click="OnClose" />
-        <MenuItem Header="Close _Others" Click="OnCloseOthers" />
+        <MenuItem Header="Close O_thers" Click="OnCloseOthers" />
         <MenuItem Header="Close _All" Click="OnCloseAll" />
         <Separator />
         <MenuItem Header="E_xit" Click="OnExit" />
       </MenuItem>
+      <MenuItem Header="_Edit">
+        <MenuItem Header="_Copy" InputGesture="Ctrl+C" Click="OnCopy" />
+      </MenuItem>
       <MenuItem Header="_View">
         <MenuItem x:Name="FollowTailItem" Header="Follow _Tail" InputGesture="Ctrl+T" ToggleType="CheckBox" Click="OnToggleFollow" />
         <MenuItem x:Name="EncodingMenu" Header="_Encoding" />
+        <Separator />
+        <MenuItem x:Name="OnTopItem" Header="Always on To_p" ToggleType="CheckBox" Click="OnToggleOnTop" />
+        <MenuItem Header="_Hide Main Menu" InputGesture="Ctrl+M" Click="OnHideMenu" />
+        <Separator />
+        <MenuItem Header="_Top Half" Click="OnTile" Tag="2,0" />
+        <MenuItem Header="_Bottom Half" Click="OnTile" Tag="2,1" />
+        <MenuItem Header="_1 Top Third" Click="OnTile" Tag="3,0" />
+        <MenuItem Header="_2 Middle Third" Click="OnTile" Tag="3,1" />
+        <MenuItem Header="_3 Bottom Third" Click="OnTile" Tag="3,2" />
+        <MenuItem Header="A_utomatically Size" Click="OnAutoSize" />
+      </MenuItem>
+      <MenuItem Header="_Preferences">
+        <MenuItem Header="_Options..." Click="OnOptions" />
+        <MenuItem Header="_Highlighting..." Click="OnHighlighting" />
+        <Separator />
+        <MenuItem Header="_Load from File..." Click="OnLoadSettings" />
+        <MenuItem Header="_Save to File..." Click="OnSaveSettings" />
+      </MenuItem>
+      <MenuItem Header="_Help">
+        <MenuItem Header="Command Line _Usage" Click="OnUsage" />
+        <MenuItem Header="_About Logitail" Click="OnAbout" />
       </MenuItem>
     </Menu>
     <Border DockPanel.Dock="Bottom" BorderThickness="0,1,0,0" BorderBrush="#ddd" Padding="8,3">
-      <TextBlock x:Name="StatusText" Text="Open a file to view (Ctrl+O or drag and drop)" />
+      <TextBlock x:Name="StatusText" Text="Open a file to view (Ctrl+O or drag and drop)" TextTrimming="CharacterEllipsis" />
     </Border>
     <TabControl x:Name="Tabs" Padding="0" />
   </DockPanel>

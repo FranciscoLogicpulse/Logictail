@@ -12,7 +12,7 @@ public sealed record HighlightRule
     /// <summary>Treat <see cref="Pattern"/> as a regular expression instead of plain text.</summary>
     public bool IsRegex { get; init; }
     public uint Foreground { get; init; } = 0xFF000000;
-    public uint Background { get; init; } = 0xFFFFFF00;
+    public uint Background { get; init; } = 0xFFFFEB3B; // "Yellow" in the color list
     public bool Bold { get; init; }
     public bool Italic { get; init; }
 }
